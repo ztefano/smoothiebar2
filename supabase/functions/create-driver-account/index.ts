@@ -1,8 +1,16 @@
 // Edge Function: crea una cuenta de chofer. Solo puede llamarla un usuario
 // autenticado con profiles.is_admin = true. El chofer creado no pasa por
 // registro propio: entra directo con el email/contraseña que le da el admin.
+//
+// Sin dependencias de archivos compartidos a propósito, para poder
+// desplegarla pegando este archivo directo en el editor del dashboard de
+// Supabase (sin necesidad de la CLI).
 import { createClient } from "npm:@supabase/supabase-js@2.45.4";
-import { corsHeaders, createAdminClient } from "../_shared/supabaseAdmin.ts";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -13,7 +21,10 @@ Deno.serve(async (req) => {
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
-    if (!supabaseUrl || !anonKey) throw new Error("Falta configuración del proyecto.");
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    if (!supabaseUrl || !anonKey || !serviceRoleKey) {
+      throw new Error("Falta configuración del proyecto.");
+    }
 
     // Cliente con la identidad de quien llama, para validar que sea admin.
     const callerClient = createClient(supabaseUrl, anonKey, {
@@ -41,7 +52,8 @@ Deno.serve(async (req) => {
     const { fullName, phone, email, password } = await req.json();
     if (!fullName || !email || !password) throw new Error("Faltan datos del chofer.");
 
-    const admin = createAdminClient();
+    // Cliente con la service role key: puede crear usuarios directamente.
+    const admin = createClient(supabaseUrl, serviceRoleKey);
     const { data: created, error } = await admin.auth.admin.createUser({
       email,
       password,

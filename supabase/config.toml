@@ -1,0 +1,18 @@
+project_id = "chofer-de-reemplazo"
+
+[api]
+enabled = true
+port = 54321
+
+[db]
+port = 54322
+
+[auth]
+enabled = true
+enable_signup = true
+
+[realtime]
+enabled = true
+
+[edge_runtime]
+enabled = true

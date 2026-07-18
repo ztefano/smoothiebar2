@@ -1,9 +1,10 @@
 import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import { router } from "expo-router";
 import { useAuth } from "@/state/AuthContext";
+import { EditableProfileHeader } from "@/components/EditableProfileHeader";
 
 export default function DriverProfileScreen() {
-  const { profile, session, signOut } = useAuth();
+  const { profile, session, signOut, refreshProfile } = useAuth();
 
   async function handleSignOut() {
     await signOut();
@@ -12,12 +13,14 @@ export default function DriverProfileScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.name}>
-        {profile?.full_name} {profile?.last_name}
-      </Text>
-      <Text style={styles.meta}>{session?.user.email}</Text>
-      <Text style={styles.meta}>{profile?.phone}</Text>
-      <Text style={styles.role}>{profile?.is_admin ? "Chofer · Admin" : "Chofer"}</Text>
+      {profile ? (
+        <EditableProfileHeader
+          profile={profile}
+          email={session?.user.email}
+          roleLabel={profile.is_admin ? "Chofer · Admin" : "Chofer"}
+          onSaved={refreshProfile}
+        />
+      ) : null}
 
       <Pressable
         style={styles.signOut}
@@ -34,9 +37,6 @@ export default function DriverProfileScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 24, gap: 6 },
-  name: { fontSize: 22, fontWeight: "800", color: "#111827" },
-  meta: { fontSize: 14, color: "#6B7280" },
-  role: { fontSize: 13, fontWeight: "600", color: "#2563EB", marginBottom: 24 },
   signOut: {
     marginTop: "auto",
     borderRadius: 10,

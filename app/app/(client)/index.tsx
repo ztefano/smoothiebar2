@@ -18,6 +18,7 @@ import { DateTimeField } from "@/components/DateTimeField";
 import { supabase } from "@/lib/supabase";
 import { estimatePrice, formatEuros } from "@/lib/pricing";
 import { formatVehicleParts } from "@/hooks/useVehicles";
+import { useBookedTimes } from "@/hooks/useBookedTimes";
 import type { Coordinates } from "@/types";
 
 const MIN_LEAD_TIME_MS = 2 * 60 * 60 * 1000; // los choferes se piden con 2h de anticipación mínima
@@ -39,6 +40,7 @@ export default function RequestChoferScreen() {
     ? estimatePrice(effectivePickup, dropoff, scheduledAt)
     : null;
   const vehicleInfo = formatVehicleParts(vehicle.brand, vehicle.model, vehicle.plate);
+  const bookedTimes = useBookedTimes(scheduledAt);
 
   async function handleRequest() {
     if (!profile || !effectivePickup) return;
@@ -143,6 +145,16 @@ export default function RequestChoferScreen() {
         onChange={setScheduledAt}
       />
 
+      {bookedTimes.length > 0 ? (
+        <Text style={styles.bookedHint}>
+          Horarios ya pedidos ese día (a modo de referencia):{" "}
+          {bookedTimes
+            .map((t) => t.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" }))
+            .sort()
+            .join(", ")}
+        </Text>
+      ) : null}
+
       {priceEstimate ? (
         <Text style={styles.price}>Tarifa estimada: {formatEuros(priceEstimate)}</Text>
       ) : null}
@@ -163,6 +175,7 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
   title: { fontSize: 22, fontWeight: "800", color: "#111827" },
   subtitle: { fontSize: 13, color: "#6B7280", marginBottom: 4 },
+  bookedHint: { fontSize: 12, color: "#D97706", backgroundColor: "#FFFBEB", padding: 10, borderRadius: 8 },
   price: { fontSize: 16, fontWeight: "700", color: "#111827" },
   button: { backgroundColor: "#111827", borderRadius: 10, paddingVertical: 14, alignItems: "center" },
   buttonText: { color: "white", fontWeight: "700", fontSize: 15 },

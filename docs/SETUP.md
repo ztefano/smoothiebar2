@@ -100,22 +100,34 @@ EAS, agregá un ícono de 1024x1024 en esa ruta y descomentá la línea
 `icon: "./assets/icon.png"` en `app/app.config.js` (sin ícono, Expo Go
 funciona igual para desarrollo, pero el build de producción lo requiere).
 
-## 6. Compilar para un teléfono real (EAS Build)
+## 6. Compilar un APK para instalar en tu teléfono (EAS Build)
 
-Expo Go alcanza para desarrollar, pero para instalar en un teléfono real
-(o publicar en las tiendas) necesitás un build con **EAS**:
+Expo Go alcanza para desarrollar, pero para instalar la app directo en un
+teléfono Android (sin pasar por Google Play) necesitás compilarla con
+**EAS Build** — corre en los servidores de Expo, así que no requiere tener
+Android Studio instalado. El repo ya incluye `app/eas.json` con un perfil
+`preview` configurado para generar un `.apk` (los builds normales de Play
+Store generan `.aab`, que no se puede instalar directo).
 
 ```bash
 npm install -g eas-cli
-eas login
-eas build:configure
+eas login              # creá una cuenta gratis en expo.dev si no tenés
+cd app
+eas build:configure    # vincula el proyecto a tu cuenta (genera un projectId)
 eas build --platform android --profile preview
-eas build --platform ios --profile preview   # requiere cuenta de Apple Developer
 ```
 
-Un *development build* (`eas build --profile development`) también
-habilita el rastreo de ubicación en segundo plano para los choferes, que
-Expo Go no soporta.
+Al terminar (uns 10-20 min), la terminal te da un link para descargar el
+`.apk`. Abrilo desde el teléfono (puede pedirte habilitar "instalar apps de
+orígenes desconocidos") para instalarlo.
+
+Para iOS no existe el equivalente al `.apk`: instalar en un iPhone sin pasar
+por la App Store requiere sí o sí una cuenta de Apple Developer (99 USD/año)
+y `eas build --platform ios --profile preview`.
+
+Un *development build* (`eas build --profile development`) además habilita
+el rastreo de ubicación en segundo plano para los choferes, que Expo Go no
+soporta.
 
 ## 7. Publicar en las tiendas
 

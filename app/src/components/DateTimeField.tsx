@@ -1,46 +1,38 @@
 import { useRef, useState } from "react";
 import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
+import { TimeSlotGrid } from "@/components/TimeSlotGrid";
 
 interface DateTimeFieldProps {
   label: string;
   value: Date;
-  minimumDate?: Date;
+  minimumDate: Date;
+  bookedTimes: Date[];
   onChange: (date: Date) => void;
 }
 
 /**
- * Selector de fecha y hora. En iOS usa el spinner combinado nativo, pero en
- * Android el modo "datetime" no existe (el picker del sistema solo soporta
- * "date" o "time" por separado) — usarlo ahí crashea la app. Por eso en
- * Android se pide primero la fecha y, al confirmarla, se abre el picker de
- * hora sobre esa misma fecha elegida.
+ * Selector de fecha y hora. Primero se elige la fecha con el picker nativo
+ * del sistema; la hora se elige después con una grilla (TimeSlotGrid) en
+ * vez del reloj nativo, para que se vean rápido los horarios ya ocupados.
  */
-export function DateTimeField({ label, value, minimumDate, onChange }: DateTimeFieldProps) {
+export function DateTimeField({ label, value, minimumDate, bookedTimes, onChange }: DateTimeFieldProps) {
   const [step, setStep] = useState<"none" | "date" | "time">("none");
   const pendingDateRef = useRef<Date | null>(null);
 
-  function handleAndroidDateChange(_event: unknown, date?: Date) {
-    if (!date) {
-      setStep("none");
-      return;
-    }
+  function handleDateChange(_event: unknown, date?: Date) {
+    setStep("none");
+    if (!date) return;
     pendingDateRef.current = date;
     setStep("time");
   }
 
-  function handleAndroidTimeChange(_event: unknown, time?: Date) {
-    setStep("none");
-    if (!time || !pendingDateRef.current) return;
-    const combined = new Date(pendingDateRef.current);
-    combined.setHours(time.getHours(), time.getMinutes());
+  function handleTimeSelect(time: Date) {
+    const base = pendingDateRef.current ?? value;
+    const combined = new Date(base);
+    combined.setHours(time.getHours(), time.getMinutes(), 0, 0);
     onChange(combined);
     pendingDateRef.current = null;
-  }
-
-  function handleIosChange(_event: unknown, date?: Date) {
-    setStep("none");
-    if (date) onChange(date);
   }
 
   return (
@@ -50,34 +42,25 @@ export function DateTimeField({ label, value, minimumDate, onChange }: DateTimeF
         <Text style={styles.buttonText}>{value.toLocaleString("es-ES")}</Text>
       </Pressable>
 
-      {Platform.OS === "android" && step === "date" ? (
+      {step === "date" ? (
         <DateTimePicker
           value={value}
           mode="date"
           minimumDate={minimumDate}
-          display="default"
-          onChange={handleAndroidDateChange}
+          display={Platform.OS === "ios" ? "spinner" : "default"}
+          onChange={handleDateChange}
         />
       ) : null}
 
-      {Platform.OS === "android" && step === "time" ? (
-        <DateTimePicker
-          value={value}
-          mode="time"
-          display="default"
-          onChange={handleAndroidTimeChange}
-        />
-      ) : null}
-
-      {Platform.OS === "ios" && step !== "none" ? (
-        <DateTimePicker
-          value={value}
-          mode="datetime"
-          minimumDate={minimumDate}
-          display="spinner"
-          onChange={handleIosChange}
-        />
-      ) : null}
+      <TimeSlotGrid
+        visible={step === "time"}
+        date={pendingDateRef.current ?? value}
+        minimumDateTime={minimumDate}
+        bookedTimes={bookedTimes}
+        selected={value}
+        onSelect={handleTimeSelect}
+        onClose={() => setStep("none")}
+      />
     </View>
   );
 }

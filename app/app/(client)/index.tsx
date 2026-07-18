@@ -142,18 +142,9 @@ export default function RequestChoferScreen() {
         label="Fecha y hora del servicio"
         value={scheduledAt}
         minimumDate={minimumDate}
+        bookedTimes={bookedTimes}
         onChange={setScheduledAt}
       />
-
-      {bookedTimes.length > 0 ? (
-        <Text style={styles.bookedHint}>
-          Horarios ya pedidos ese día (a modo de referencia):{" "}
-          {bookedTimes
-            .map((t) => t.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" }))
-            .sort()
-            .join(", ")}
-        </Text>
-      ) : null}
 
       {priceEstimate ? (
         <Text style={styles.price}>Tarifa estimada: {formatEuros(priceEstimate)}</Text>
@@ -175,7 +166,6 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
   title: { fontSize: 22, fontWeight: "800", color: "#111827" },
   subtitle: { fontSize: 13, color: "#6B7280", marginBottom: 4 },
-  bookedHint: { fontSize: 12, color: "#D97706", backgroundColor: "#FFFBEB", padding: 10, borderRadius: 8 },
   price: { fontSize: 16, fontWeight: "700", color: "#111827" },
   button: { backgroundColor: "#111827", borderRadius: 10, paddingVertical: 14, alignItems: "center" },
   buttonText: { color: "white", fontWeight: "700", fontSize: 15 },

@@ -1,0 +1,13 @@
+name: Publicar actualización OTA
+
+on:
+  push:
+    branches: ['claude/replacement-driver-app-tkn86c']
+
+jobs:
+  publish_update:
+    name: Publish update
+    type: update
+    params:
+      branch: preview
+      message: Actualización automática desde GitHub

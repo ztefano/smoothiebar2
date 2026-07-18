@@ -1,7 +1,7 @@
 module.exports = ({ config }) => ({
   ...config,
   name: "Chofer de Reemplazo",
-  slug: "chofer-de-reemplazo",
+  slug: "app",
   owner: "ztefanohs-team",
   scheme: process.env.EXPO_PUBLIC_APP_SCHEME || "choferdereemplazo",
   version: "1.0.0",

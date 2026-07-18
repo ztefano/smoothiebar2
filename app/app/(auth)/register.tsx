@@ -28,8 +28,22 @@ export default function RegisterScreen() {
     }
     setLoading(true);
     try {
-      await signUp({ email: email.trim(), password, fullName, phone, role });
-      router.replace("/");
+      const { needsEmailConfirmation } = await signUp({
+        email: email.trim(),
+        password,
+        fullName,
+        phone,
+        role,
+      });
+      if (needsEmailConfirmation) {
+        Alert.alert(
+          "Confirmá tu correo",
+          "Te enviamos un correo de confirmación. Abrí el link y después volvé a iniciar sesión con tu contraseña.",
+          [{ text: "OK", onPress: () => router.replace("/(auth)/login") }]
+        );
+      } else {
+        router.replace("/");
+      }
     } catch (err) {
       Alert.alert("No se pudo crear la cuenta", (err as Error).message);
     } finally {

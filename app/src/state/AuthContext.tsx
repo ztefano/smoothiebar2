@@ -14,7 +14,7 @@ interface AuthContextValue {
     fullName: string;
     phone: string;
     role: UserRole;
-  }) => Promise<void>;
+  }) => Promise<{ needsEmailConfirmation: boolean }>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
 }
@@ -72,20 +72,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data, error } = await supabase.auth.signUp({
       email: params.email,
       password: params.password,
+      options: {
+        data: {
+          full_name: params.fullName,
+          phone: params.phone,
+          role: params.role,
+        },
+      },
     });
     if (error) throw error;
     if (!data.user) throw new Error("No se pudo crear el usuario.");
 
-    const { error: profileError } = await supabase.from("profiles").insert({
-      id: data.user.id,
-      full_name: params.fullName,
-      phone: params.phone,
-      role: params.role,
-      is_online: false,
-    });
-    if (profileError) throw profileError;
-
-    await loadProfile(data.user.id);
+    // El perfil lo crea un trigger en la base de datos a partir de estos
+    // metadatos (ver supabase/migrations/0002_auto_create_profile.sql), así
+    // que funciona haya o no confirmación de email activada.
+    if (data.session) {
+      await loadProfile(data.user.id);
+      return { needsEmailConfirmation: false };
+    }
+    return { needsEmailConfirmation: true };
   }
 
   async function signOut() {

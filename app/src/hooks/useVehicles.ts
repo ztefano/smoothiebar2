@@ -45,5 +45,13 @@ export function useVehicles(clientId: string | null) {
 }
 
 export function formatVehicle(vehicle: Vehicle): string {
-  return [vehicle.brand, vehicle.model, vehicle.plate].filter(Boolean).join(" · ");
+  return formatVehicleParts(vehicle.brand, vehicle.model, vehicle.plate);
+}
+
+export function formatVehicleParts(
+  brand: string | null,
+  model: string | null,
+  plate: string | null
+): string {
+  return [brand, model, plate].filter(Boolean).join(" · ");
 }

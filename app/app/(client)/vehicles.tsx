@@ -11,6 +11,8 @@ import {
 } from "react-native";
 import { useAuth } from "@/state/AuthContext";
 import { useVehicles, formatVehicle } from "@/hooks/useVehicles";
+import { SelectModal } from "@/components/SelectModal";
+import { CAR_BRANDS, modelsForBrand } from "@/lib/carCatalog";
 
 export default function VehiclesScreen() {
   const { profile } = useAuth();
@@ -57,6 +59,8 @@ export default function VehiclesScreen() {
     );
   }
 
+  const models = modelsForBrand(brand);
+
   return (
     <FlatList
       contentContainerStyle={styles.list}
@@ -65,8 +69,27 @@ export default function VehiclesScreen() {
       ListHeaderComponent={
         <View style={styles.form}>
           <Text style={styles.title}>Mis vehículos</Text>
-          <TextInput style={styles.input} placeholder="Marca" value={brand} onChangeText={setBrand} />
-          <TextInput style={styles.input} placeholder="Modelo" value={model} onChangeText={setModel} />
+
+          <View style={styles.row}>
+            <SelectModal
+              label="Marca"
+              placeholder="Marca"
+              value={brand}
+              options={CAR_BRANDS}
+              onSelect={(selected) => {
+                setBrand(selected);
+                setModel(""); // cambia la marca, se resetea el modelo
+              }}
+            />
+            <SelectModal
+              label="Modelo"
+              placeholder="Modelo"
+              value={model}
+              options={models}
+              onSelect={setModel}
+            />
+          </View>
+
           <TextInput style={styles.input} placeholder="Patente" value={plate} onChangeText={setPlate} />
           <Pressable style={styles.addButton} onPress={handleAdd} disabled={submitting}>
             {submitting ? (
@@ -101,6 +124,7 @@ const styles = StyleSheet.create({
   list: { padding: 20, gap: 10, flexGrow: 1 },
   form: { gap: 10, marginBottom: 20 },
   title: { fontSize: 22, fontWeight: "800", color: "#111827", marginBottom: 4 },
+  row: { flexDirection: "row", gap: 8 },
   input: {
     borderWidth: 1,
     borderColor: "#E5E7EB",

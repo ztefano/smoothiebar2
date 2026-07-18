@@ -13,10 +13,11 @@ import { useAuth } from "@/state/AuthContext";
 import { useCurrentLocation } from "@/hooks/useLocation";
 import { MapPicker } from "@/components/MapPicker";
 import { AddressField } from "@/components/AddressField";
-import { VehicleQuickSelect } from "@/components/VehicleQuickSelect";
+import { VehicleQuickSelect, type VehicleParts } from "@/components/VehicleQuickSelect";
 import { DateTimeField } from "@/components/DateTimeField";
 import { supabase } from "@/lib/supabase";
 import { estimatePrice, formatEuros } from "@/lib/pricing";
+import { formatVehicleParts } from "@/hooks/useVehicles";
 import type { Coordinates } from "@/types";
 
 export default function ScheduleScreen() {
@@ -26,7 +27,7 @@ export default function ScheduleScreen() {
   const [address, setAddress] = useState("");
   const [dropoffAddress, setDropoffAddress] = useState("");
   const [dropoff, setDropoff] = useState<Coordinates | null>(null);
-  const [vehicleInfo, setVehicleInfo] = useState("");
+  const [vehicle, setVehicle] = useState<VehicleParts>({ brand: "", model: "", plate: "" });
   const [scheduledAt, setScheduledAt] = useState(() => new Date(Date.now() + 60 * 60 * 1000));
   const [submitting, setSubmitting] = useState(false);
 
@@ -34,11 +35,12 @@ export default function ScheduleScreen() {
   const priceEstimate = effectivePickup
     ? estimatePrice(effectivePickup, dropoff, scheduledAt)
     : null;
+  const vehicleInfo = formatVehicleParts(vehicle.brand, vehicle.model, vehicle.plate);
 
   async function handleSchedule() {
     if (!profile || !effectivePickup) return;
-    if (!address.trim() || !vehicleInfo.trim()) {
-      Alert.alert("Faltan datos", "Ingresá la dirección y los datos del vehículo.");
+    if (!address.trim() || !dropoffAddress.trim() || !dropoff || !vehicleInfo) {
+      Alert.alert("Faltan datos", "Ingresá el punto de encuentro, el destino y los datos del vehículo.");
       return;
     }
     if (scheduledAt.getTime() < Date.now()) {
@@ -59,7 +61,7 @@ export default function ScheduleScreen() {
           dropoff_address: dropoffAddress.trim() || null,
           dropoff_lat: dropoff?.lat ?? null,
           dropoff_lng: dropoff?.lng ?? null,
-          vehicle_info: vehicleInfo.trim(),
+          vehicle_info: vehicleInfo,
           price_estimate: priceEstimate,
           scheduled_at: scheduledAt.toISOString(),
         })
@@ -102,6 +104,7 @@ export default function ScheduleScreen() {
         value={address}
         onChangeText={setAddress}
         onSelectPlace={({ coords }) => setPickup(coords)}
+        currentLocation={location}
       />
 
       <MapPicker
@@ -112,18 +115,14 @@ export default function ScheduleScreen() {
 
       <AddressField
         clientId={profile?.id ?? null}
-        label="Destino (opcional)"
+        label="Destino"
         value={dropoffAddress}
         onChangeText={setDropoffAddress}
         onSelectPlace={({ coords }) => setDropoff(coords)}
         placeholder="¿A dónde vas? (ej: Casa)"
       />
 
-      <VehicleQuickSelect
-        clientId={profile?.id ?? null}
-        value={vehicleInfo}
-        onChangeText={setVehicleInfo}
-      />
+      <VehicleQuickSelect clientId={profile?.id ?? null} value={vehicle} onChange={setVehicle} />
 
       <DateTimeField
         label="Fecha y hora del servicio"

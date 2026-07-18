@@ -2,30 +2,69 @@ import { router } from "expo-router";
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useVehicles, formatVehicle } from "@/hooks/useVehicles";
 
-interface VehicleQuickSelectProps {
-  clientId: string | null;
-  value: string;
-  onChangeText: (text: string) => void;
+export interface VehicleParts {
+  brand: string;
+  model: string;
+  plate: string;
 }
 
-/** Chips con los vehículos guardados del cliente, más un campo libre por si no eligió ninguno. */
-export function VehicleQuickSelect({ clientId, value, onChangeText }: VehicleQuickSelectProps) {
+interface VehicleQuickSelectProps {
+  clientId: string | null;
+  value: VehicleParts;
+  onChange: (value: VehicleParts) => void;
+}
+
+/** Marca/modelo/patente en 3 campos, más chips con los vehículos guardados del cliente. */
+export function VehicleQuickSelect({ clientId, value, onChange }: VehicleQuickSelectProps) {
   const { vehicles } = useVehicles(clientId);
 
   return (
     <View style={{ gap: 8 }}>
+      <Text style={styles.label}>Vehículo</Text>
+
+      <View style={styles.row}>
+        <TextInput
+          style={[styles.input, styles.inputThird]}
+          placeholder="Marca"
+          value={value.brand}
+          onChangeText={(brand) => onChange({ ...value, brand })}
+        />
+        <TextInput
+          style={[styles.input, styles.inputThird]}
+          placeholder="Modelo"
+          value={value.model}
+          onChangeText={(model) => onChange({ ...value, model })}
+        />
+        <TextInput
+          style={[styles.input, styles.inputThird]}
+          placeholder="Patente"
+          value={value.plate}
+          onChangeText={(plate) => onChange({ ...value, plate })}
+        />
+      </View>
+
       {vehicles.length > 0 ? (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
           {vehicles.map((vehicle) => {
-            const formatted = formatVehicle(vehicle);
-            const active = value === formatted;
+            const active =
+              value.brand === (vehicle.brand ?? "") &&
+              value.model === (vehicle.model ?? "") &&
+              value.plate === (vehicle.plate ?? "");
             return (
               <Pressable
                 key={vehicle.id}
                 style={[styles.chip, active && styles.chipActive]}
-                onPress={() => onChangeText(formatted)}
+                onPress={() =>
+                  onChange({
+                    brand: vehicle.brand ?? "",
+                    model: vehicle.model ?? "",
+                    plate: vehicle.plate ?? "",
+                  })
+                }
               >
-                <Text style={[styles.chipText, active && styles.chipTextActive]}>{vehicle.label}</Text>
+                <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                  {vehicle.label} — {formatVehicle(vehicle) || "sin datos"}
+                </Text>
               </Pressable>
             );
           })}
@@ -38,19 +77,15 @@ export function VehicleQuickSelect({ clientId, value, onChangeText }: VehicleQui
           <Text style={styles.manageLink}>+ Guardar un vehículo para elegirlo rápido la próxima vez</Text>
         </Pressable>
       )}
-
-      <TextInput
-        style={styles.input}
-        placeholder="Datos del vehículo (marca, modelo, patente)"
-        value={value}
-        onChangeText={onChangeText}
-      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  row: { gap: 8 },
+  label: { fontSize: 14, fontWeight: "600", color: "#111827" },
+  row: { flexDirection: "row", gap: 8 },
+  inputThird: { flex: 1 },
+  chipRow: { gap: 8 },
   chip: {
     borderWidth: 1,
     borderColor: "#E5E7EB",
@@ -75,8 +110,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#E5E7EB",
     borderRadius: 10,
-    paddingHorizontal: 14,
+    paddingHorizontal: 10,
     paddingVertical: 12,
-    fontSize: 15,
+    fontSize: 14,
   },
 });

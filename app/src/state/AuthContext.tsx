@@ -14,6 +14,7 @@ interface AuthContextValue {
     email: string;
     password: string;
     fullName: string;
+    lastName: string;
     phone: string;
     role: UserRole;
   }) => Promise<{ needsEmailConfirmation: boolean }>;
@@ -69,6 +70,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     email: string;
     password: string;
     fullName: string;
+    lastName: string;
     phone: string;
     role: UserRole;
   }) {
@@ -78,6 +80,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       options: {
         data: {
           full_name: params.fullName,
+          last_name: params.lastName,
           phone: params.phone,
           role: params.role,
         },

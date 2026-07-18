@@ -11,19 +11,23 @@ import {
 } from "react-native";
 import { useAuth } from "@/state/AuthContext";
 import { supabase } from "@/lib/supabase";
-import type { UserRole } from "@/types";
 
-/** Paso extra para cuentas creadas por login social, que no piden teléfono/rol. */
+/**
+ * Paso extra para cuentas creadas por login social, que no piden
+ * teléfono/apellido. El rol siempre queda en "client": las cuentas de
+ * chofer las crea el administrador, nunca por autorregistro (ni siquiera
+ * por Google).
+ */
 export default function CompleteProfileScreen() {
   const { session, refreshProfile } = useAuth();
+  const [lastName, setLastName] = useState("");
   const [phone, setPhone] = useState("");
-  const [role, setRole] = useState<UserRole>("client");
   const [loading, setLoading] = useState(false);
 
   async function handleSave() {
     if (!session) return;
-    if (!phone.trim()) {
-      Alert.alert("Faltan datos", "Ingresá tu teléfono.");
+    if (!lastName.trim() || !phone.trim()) {
+      Alert.alert("Faltan datos", "Ingresá tu apellido y tu teléfono.");
       return;
     }
 
@@ -31,7 +35,7 @@ export default function CompleteProfileScreen() {
     try {
       const { error } = await supabase
         .from("profiles")
-        .update({ phone: phone.trim(), role })
+        .update({ last_name: lastName.trim(), phone: phone.trim() })
         .eq("id", session.user.id);
       if (error) throw error;
 
@@ -49,25 +53,7 @@ export default function CompleteProfileScreen() {
       <Text style={styles.title}>Un último paso</Text>
       <Text style={styles.subtitle}>Completá estos datos para terminar tu cuenta.</Text>
 
-      <View style={styles.roleSwitch}>
-        <Pressable
-          style={[styles.roleButton, role === "client" && styles.roleButtonActive]}
-          onPress={() => setRole("client")}
-        >
-          <Text style={[styles.roleText, role === "client" && styles.roleTextActive]}>
-            Soy cliente
-          </Text>
-        </Pressable>
-        <Pressable
-          style={[styles.roleButton, role === "driver" && styles.roleButtonActive]}
-          onPress={() => setRole("driver")}
-        >
-          <Text style={[styles.roleText, role === "driver" && styles.roleTextActive]}>
-            Soy chofer
-          </Text>
-        </Pressable>
-      </View>
-
+      <TextInput style={styles.input} placeholder="Apellido" value={lastName} onChangeText={setLastName} />
       <TextInput
         style={styles.input}
         placeholder="Teléfono"
@@ -87,18 +73,6 @@ const styles = StyleSheet.create({
   container: { flex: 1, justifyContent: "center", padding: 24, gap: 12, backgroundColor: "white" },
   title: { fontSize: 24, fontWeight: "800", color: "#111827", textAlign: "center" },
   subtitle: { fontSize: 13, color: "#6B7280", textAlign: "center", marginBottom: 12 },
-  roleSwitch: { flexDirection: "row", gap: 8, marginBottom: 8 },
-  roleButton: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    alignItems: "center",
-  },
-  roleButtonActive: { backgroundColor: "#111827", borderColor: "#111827" },
-  roleText: { fontWeight: "600", color: "#374151" },
-  roleTextActive: { color: "white" },
   input: {
     borderWidth: 1,
     borderColor: "#E5E7EB",

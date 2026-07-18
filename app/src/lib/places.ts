@@ -73,3 +73,27 @@ export async function getPlaceCoordinates(
     return null;
   }
 }
+
+/** Convierte coordenadas en una dirección legible ("Geocodificación inversa"). */
+export async function reverseGeocode(coords: Coordinates): Promise<string | null> {
+  const apiKey = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
+  if (!apiKey) return null;
+
+  const params = new URLSearchParams({
+    latlng: `${coords.lat},${coords.lng}`,
+    key: apiKey,
+    language: "es",
+  });
+
+  try {
+    const response = await fetch(
+      `https://maps.googleapis.com/maps/api/geocode/json?${params.toString()}`
+    );
+    const data = await response.json();
+    const address = data.results?.[0]?.formatted_address;
+    if (data.status !== "OK" || !address) return null;
+    return address as string;
+  } catch {
+    return null;
+  }
+}

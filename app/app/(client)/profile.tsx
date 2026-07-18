@@ -3,7 +3,7 @@ import { router } from "expo-router";
 import { useAuth } from "@/state/AuthContext";
 
 export default function ClientProfileScreen() {
-  const { profile, signOut } = useAuth();
+  const { profile, session, signOut } = useAuth();
 
   async function handleSignOut() {
     await signOut();
@@ -12,7 +12,10 @@ export default function ClientProfileScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.name}>{profile?.full_name}</Text>
+      <Text style={styles.name}>
+        {profile?.full_name} {profile?.last_name}
+      </Text>
+      <Text style={styles.meta}>{session?.user.email}</Text>
       <Text style={styles.meta}>{profile?.phone}</Text>
       <Text style={styles.role}>Cliente</Text>
 

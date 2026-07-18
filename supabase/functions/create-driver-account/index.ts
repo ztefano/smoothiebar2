@@ -49,8 +49,8 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { fullName, phone, email, password } = await req.json();
-    if (!fullName || !email || !password) throw new Error("Faltan datos del chofer.");
+    const { fullName, lastName, phone, email, password } = await req.json();
+    if (!fullName || !lastName || !email || !password) throw new Error("Faltan datos del chofer.");
 
     // Cliente con la service role key: puede crear usuarios directamente.
     const admin = createClient(supabaseUrl, serviceRoleKey);
@@ -60,6 +60,7 @@ Deno.serve(async (req) => {
       email_confirm: true, // el chofer puede loguearse de inmediato, sin confirmar mail
       user_metadata: {
         full_name: fullName,
+        last_name: lastName,
         phone: phone ?? null,
         role: "driver",
       },

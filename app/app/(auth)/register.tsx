@@ -14,6 +14,7 @@ import { useAuth } from "@/state/AuthContext";
 export default function RegisterScreen() {
   const { signUp, signInWithGoogle } = useAuth();
   const [fullName, setFullName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -33,8 +34,8 @@ export default function RegisterScreen() {
   }
 
   async function handleRegister() {
-    if (!fullName || !email || !password) {
-      Alert.alert("Faltan datos", "Completá nombre, correo y contraseña.");
+    if (!fullName || !lastName || !email || !password) {
+      Alert.alert("Faltan datos", "Completá nombre, apellido, correo y contraseña.");
       return;
     }
     setLoading(true);
@@ -43,6 +44,7 @@ export default function RegisterScreen() {
         email: email.trim(),
         password,
         fullName,
+        lastName,
         phone,
         role: "client",
       });
@@ -70,7 +72,8 @@ export default function RegisterScreen() {
         cuenta e iniciá sesión desde "Soy chofer" en la pantalla de login.
       </Text>
 
-      <TextInput style={styles.input} placeholder="Nombre completo" value={fullName} onChangeText={setFullName} />
+      <TextInput style={styles.input} placeholder="Nombre" value={fullName} onChangeText={setFullName} />
+      <TextInput style={styles.input} placeholder="Apellido" value={lastName} onChangeText={setLastName} />
       <TextInput style={styles.input} placeholder="Teléfono" keyboardType="phone-pad" value={phone} onChangeText={setPhone} />
       <TextInput
         style={styles.input}

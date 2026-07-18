@@ -13,9 +13,10 @@ import { useAuth } from "@/state/AuthContext";
 import { useCurrentLocation } from "@/hooks/useLocation";
 import { MapPicker } from "@/components/MapPicker";
 import { AddressField } from "@/components/AddressField";
-import { VehicleQuickSelect } from "@/components/VehicleQuickSelect";
+import { VehicleQuickSelect, type VehicleParts } from "@/components/VehicleQuickSelect";
 import { supabase } from "@/lib/supabase";
 import { estimatePrice, formatEuros } from "@/lib/pricing";
+import { formatVehicleParts } from "@/hooks/useVehicles";
 import type { Coordinates } from "@/types";
 
 export default function RequestNowScreen() {
@@ -25,16 +26,17 @@ export default function RequestNowScreen() {
   const [address, setAddress] = useState("");
   const [dropoffAddress, setDropoffAddress] = useState("");
   const [dropoff, setDropoff] = useState<Coordinates | null>(null);
-  const [vehicleInfo, setVehicleInfo] = useState("");
+  const [vehicle, setVehicle] = useState<VehicleParts>({ brand: "", model: "", plate: "" });
   const [submitting, setSubmitting] = useState(false);
 
   const effectivePickup = pickup ?? location;
   const priceEstimate = effectivePickup ? estimatePrice(effectivePickup, dropoff) : null;
+  const vehicleInfo = formatVehicleParts(vehicle.brand, vehicle.model, vehicle.plate);
 
   async function handleRequest() {
     if (!profile || !effectivePickup) return;
-    if (!address.trim() || !vehicleInfo.trim()) {
-      Alert.alert("Faltan datos", "Ingresá la dirección y los datos del vehículo.");
+    if (!address.trim() || !dropoffAddress.trim() || !dropoff || !vehicleInfo) {
+      Alert.alert("Faltan datos", "Ingresá el punto de encuentro, el destino y los datos del vehículo.");
       return;
     }
 
@@ -51,7 +53,7 @@ export default function RequestNowScreen() {
           dropoff_address: dropoffAddress.trim() || null,
           dropoff_lat: dropoff?.lat ?? null,
           dropoff_lng: dropoff?.lng ?? null,
-          vehicle_info: vehicleInfo.trim(),
+          vehicle_info: vehicleInfo,
           price_estimate: priceEstimate,
           scheduled_at: null,
         })
@@ -98,6 +100,7 @@ export default function RequestNowScreen() {
         onChangeText={setAddress}
         onSelectPlace={({ coords }) => setPickup(coords)}
         placeholder="Dirección (ej: Av. Providencia 1234, depto 5)"
+        currentLocation={location}
       />
 
       <MapPicker
@@ -108,18 +111,14 @@ export default function RequestNowScreen() {
 
       <AddressField
         clientId={profile?.id ?? null}
-        label="Destino (opcional)"
+        label="Destino"
         value={dropoffAddress}
         onChangeText={setDropoffAddress}
         onSelectPlace={({ coords }) => setDropoff(coords)}
         placeholder="¿A dónde vas? (ej: Casa)"
       />
 
-      <VehicleQuickSelect
-        clientId={profile?.id ?? null}
-        value={vehicleInfo}
-        onChangeText={setVehicleInfo}
-      />
+      <VehicleQuickSelect clientId={profile?.id ?? null} value={vehicle} onChange={setVehicle} />
 
       {priceEstimate ? (
         <Text style={styles.price}>Tarifa estimada: {formatEuros(priceEstimate)}</Text>

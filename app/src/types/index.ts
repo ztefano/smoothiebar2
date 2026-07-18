@@ -12,6 +12,7 @@ export type PaymentStatus = "pending" | "approved" | "rejected";
 export interface Profile {
   id: string;
   full_name: string;
+  last_name: string | null;
   phone: string | null;
   role: UserRole;
   is_online: boolean;

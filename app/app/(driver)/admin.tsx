@@ -18,6 +18,7 @@ import type { Profile } from "@/types";
 export default function AdminScreen() {
   const { profile } = useAuth();
   const [fullName, setFullName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -44,19 +45,26 @@ export default function AdminScreen() {
   }
 
   async function handleCreate() {
-    if (!fullName.trim() || !email.trim() || !password.trim()) {
-      Alert.alert("Faltan datos", "Completá nombre, correo y contraseña.");
+    if (!fullName.trim() || !lastName.trim() || !email.trim() || !password.trim()) {
+      Alert.alert("Faltan datos", "Completá nombre, apellido, correo y contraseña.");
       return;
     }
     setSubmitting(true);
     try {
       const { error } = await supabase.functions.invoke("create-driver-account", {
-        body: { fullName: fullName.trim(), phone: phone.trim(), email: email.trim(), password },
+        body: {
+          fullName: fullName.trim(),
+          lastName: lastName.trim(),
+          phone: phone.trim(),
+          email: email.trim(),
+          password,
+        },
       });
       if (error) throw error;
 
       Alert.alert("Listo", `Se creó la cuenta de chofer para ${email.trim()}.`);
       setFullName("");
+      setLastName("");
       setPhone("");
       setEmail("");
       setPassword("");
@@ -82,7 +90,8 @@ export default function AdminScreen() {
             contraseña (sin registrarse por su cuenta).
           </Text>
 
-          <TextInput style={styles.input} placeholder="Nombre completo" value={fullName} onChangeText={setFullName} />
+          <TextInput style={styles.input} placeholder="Nombre" value={fullName} onChangeText={setFullName} />
+          <TextInput style={styles.input} placeholder="Apellido" value={lastName} onChangeText={setLastName} />
           <TextInput style={styles.input} placeholder="Teléfono" keyboardType="phone-pad" value={phone} onChangeText={setPhone} />
           <TextInput
             style={styles.input}
@@ -113,7 +122,9 @@ export default function AdminScreen() {
       ListEmptyComponent={<Text style={styles.empty}>Todavía no creaste ningún chofer.</Text>}
       renderItem={({ item }) => (
         <View style={styles.card}>
-          <Text style={styles.driverName}>{item.full_name}</Text>
+          <Text style={styles.driverName}>
+            {item.full_name} {item.last_name}
+          </Text>
           <Text style={styles.driverMeta}>{item.phone ?? "Sin teléfono"}</Text>
           <Text style={[styles.status, item.is_online ? styles.online : styles.offline]}>
             {item.is_online ? "Disponible" : "Desconectado"}

@@ -3,7 +3,6 @@ import { router } from "expo-router";
 import {
   ActivityIndicator,
   Alert,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -11,11 +10,11 @@ import {
   TextInput,
   View,
 } from "react-native";
-import DateTimePicker from "@react-native-community/datetimepicker";
 import { useAuth } from "@/state/AuthContext";
 import { useCurrentLocation } from "@/hooks/useLocation";
 import { MapPicker } from "@/components/MapPicker";
 import { AddressAutocomplete } from "@/components/AddressAutocomplete";
+import { DateTimeField } from "@/components/DateTimeField";
 import { supabase } from "@/lib/supabase";
 import { estimatePrice, formatEuros } from "@/lib/pricing";
 import type { Coordinates } from "@/types";
@@ -27,7 +26,6 @@ export default function ScheduleScreen() {
   const [address, setAddress] = useState("");
   const [vehicleInfo, setVehicleInfo] = useState("");
   const [scheduledAt, setScheduledAt] = useState(() => new Date(Date.now() + 60 * 60 * 1000));
-  const [showPicker, setShowPicker] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   const effectivePickup = pickup ?? location;
@@ -110,22 +108,12 @@ export default function ScheduleScreen() {
         onChangeText={setVehicleInfo}
       />
 
-      <Text style={styles.label}>Fecha y hora del servicio</Text>
-      <Pressable style={styles.dateButton} onPress={() => setShowPicker(true)}>
-        <Text style={styles.dateButtonText}>{scheduledAt.toLocaleString("es-ES")}</Text>
-      </Pressable>
-      {showPicker ? (
-        <DateTimePicker
-          value={scheduledAt}
-          mode="datetime"
-          minimumDate={new Date()}
-          display={Platform.OS === "ios" ? "spinner" : "default"}
-          onChange={(_event, date) => {
-            setShowPicker(Platform.OS === "ios");
-            if (date) setScheduledAt(date);
-          }}
-        />
-      ) : null}
+      <DateTimeField
+        label="Fecha y hora del servicio"
+        value={scheduledAt}
+        minimumDate={new Date()}
+        onChange={setScheduledAt}
+      />
 
       {priceEstimate ? (
         <Text style={styles.price}>Tarifa estimada: {formatEuros(priceEstimate)}</Text>
@@ -151,14 +139,6 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     fontSize: 15,
   },
-  dateButton: {
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    borderRadius: 10,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-  },
-  dateButtonText: { fontSize: 15, color: "#111827" },
   price: { fontSize: 16, fontWeight: "700", color: "#111827" },
   button: { backgroundColor: "#111827", borderRadius: 10, paddingVertical: 14, alignItems: "center" },
   buttonText: { color: "white", fontWeight: "700", fontSize: 15 },

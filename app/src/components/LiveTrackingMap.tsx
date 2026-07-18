@@ -1,7 +1,7 @@
 import { StyleSheet, Text, View } from "react-native";
 import MapView, { Marker } from "react-native-maps";
 import type { Coordinates } from "@/types";
-import { estimateEtaMinutes, haversineDistanceKm } from "@/lib/distance";
+import { useDirectionsEta } from "@/hooks/useDirectionsEta";
 
 interface LiveTrackingMapProps {
   pickup: Coordinates;
@@ -10,10 +10,7 @@ interface LiveTrackingMapProps {
 
 /** Mapa con el pin del cliente y el del chofer moviéndose en tiempo real. */
 export function LiveTrackingMap({ pickup, driverLocation }: LiveTrackingMapProps) {
-  const distanceKm = driverLocation
-    ? haversineDistanceKm(driverLocation, pickup)
-    : null;
-  const etaMinutes = distanceKm !== null ? estimateEtaMinutes(distanceKm) : null;
+  const eta = useDirectionsEta(pickup, driverLocation);
 
   return (
     <View style={styles.container}>
@@ -41,8 +38,8 @@ export function LiveTrackingMap({ pickup, driverLocation }: LiveTrackingMapProps
       </MapView>
       <View style={styles.statusBar}>
         <Text style={styles.statusText}>
-          {driverLocation
-            ? `Chofer a ${distanceKm!.toFixed(1)} km · ETA ~${etaMinutes} min`
+          {eta
+            ? `Chofer a ${eta.distanceKm.toFixed(1)} km · ETA ~${eta.etaMinutes} min`
             : "Esperando la ubicación del chofer…"}
         </Text>
       </View>

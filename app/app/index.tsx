@@ -15,5 +15,6 @@ export default function Index() {
   }
 
   if (!session || !profile) return <Redirect href="/(auth)/login" />;
+  if (!profile.phone) return <Redirect href="/(auth)/complete-profile" />;
   return <Redirect href={profile.role === "client" ? "/(client)" : "/(driver)"} />;
 }

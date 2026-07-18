@@ -15,6 +15,7 @@ import DateTimePicker from "@react-native-community/datetimepicker";
 import { useAuth } from "@/state/AuthContext";
 import { useCurrentLocation } from "@/hooks/useLocation";
 import { MapPicker } from "@/components/MapPicker";
+import { AddressAutocomplete } from "@/components/AddressAutocomplete";
 import { supabase } from "@/lib/supabase";
 import { estimatePrice, formatEuros } from "@/lib/pricing";
 import type { Coordinates } from "@/types";
@@ -90,13 +91,18 @@ export default function ScheduleScreen() {
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.title}>Agendar para más tarde</Text>
 
+      <AddressAutocomplete
+        value={address}
+        onChangeText={setAddress}
+        onSelectPlace={({ coords }) => setPickup(coords)}
+      />
+
       <MapPicker
         label="Ubicación de encuentro"
         initialLocation={effectivePickup}
         onChange={setPickup}
       />
 
-      <TextInput style={styles.input} placeholder="Dirección" value={address} onChangeText={setAddress} />
       <TextInput
         style={styles.input}
         placeholder="Datos del vehículo (marca, modelo, patente)"

@@ -1,4 +1,6 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import * as WebBrowser from "expo-web-browser";
+import * as Linking from "expo-linking";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
 import type { Profile, UserRole } from "@/types";
@@ -15,6 +17,7 @@ interface AuthContextValue {
     phone: string;
     role: UserRole;
   }) => Promise<{ needsEmailConfirmation: boolean }>;
+  signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
 }
@@ -93,6 +96,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { needsEmailConfirmation: true };
   }
 
+  async function signInWithGoogle() {
+    const redirectTo = Linking.createURL("auth/callback");
+
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo, skipBrowserRedirect: true },
+    });
+    if (error) throw error;
+    if (!data.url) throw new Error("No se pudo iniciar el login con Google.");
+
+    const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
+    if (result.type !== "success") return; // el usuario canceló
+
+    const url = new URL(result.url);
+    const code = url.searchParams.get("code");
+    if (!code) throw new Error("No se recibió el código de autenticación de Google.");
+
+    const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+    if (exchangeError) throw exchangeError;
+  }
+
   async function signOut() {
     await supabase.auth.signOut();
   }
@@ -103,7 +127,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ session, profile, loading, signIn, signUp, signOut, refreshProfile }}
+      value={{
+        session,
+        profile,
+        loading,
+        signIn,
+        signUp,
+        signInWithGoogle,
+        signOut,
+        refreshProfile,
+      }}
     >
       {children}
     </AuthContext.Provider>

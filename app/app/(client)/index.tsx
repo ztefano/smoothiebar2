@@ -13,6 +13,7 @@ import {
 import { useAuth } from "@/state/AuthContext";
 import { useCurrentLocation } from "@/hooks/useLocation";
 import { MapPicker } from "@/components/MapPicker";
+import { AddressAutocomplete } from "@/components/AddressAutocomplete";
 import { supabase } from "@/lib/supabase";
 import { estimatePrice, formatEuros } from "@/lib/pricing";
 import type { Coordinates } from "@/types";
@@ -85,18 +86,19 @@ export default function RequestNowScreen() {
         Un chofer va hasta tu ubicación y maneja tu propio auto de vuelta a casa.
       </Text>
 
+      <AddressAutocomplete
+        value={address}
+        onChangeText={setAddress}
+        onSelectPlace={({ coords }) => setPickup(coords)}
+        placeholder="Dirección (ej: Av. Providencia 1234, depto 5)"
+      />
+
       <MapPicker
         label="Ubicación de encuentro"
         initialLocation={effectivePickup}
         onChange={setPickup}
       />
 
-      <TextInput
-        style={styles.input}
-        placeholder="Dirección (ej: Av. Providencia 1234, depto 5)"
-        value={address}
-        onChangeText={setAddress}
-      />
       <TextInput
         style={styles.input}
         placeholder="Datos del vehículo (marca, modelo, patente)"

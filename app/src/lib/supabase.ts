@@ -17,5 +17,8 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: false,
+    // PKCE es el flujo recomendado para apps móviles (el código se
+    // intercambia manualmente después de volver del navegador de OAuth).
+    flowType: "pkce",
   },
 });

@@ -22,6 +22,7 @@ export function RoleGate({
   }
 
   if (!session || !profile) return <Redirect href="/(auth)/login" />;
+  if (!profile.phone) return <Redirect href="/(auth)/complete-profile" />;
   if (profile.role !== role) {
     return <Redirect href={profile.role === "client" ? "/(client)" : "/(driver)"} />;
   }

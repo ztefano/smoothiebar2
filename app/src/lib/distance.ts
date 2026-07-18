@@ -21,9 +21,9 @@ function toRadians(degrees: number): number {
 }
 
 /**
- * ETA aproximado asumiendo una velocidad promedio urbana.
- * No reemplaza a una API de rutas real (ver docs/SETUP.md para integrar
- * Google Directions y obtener tiempos/distancias por calle).
+ * ETA aproximado asumiendo una velocidad promedio urbana, usado como
+ * fallback instantáneo mientras se resuelve la ruta real (ver
+ * @/hooks/useDirectionsEta, que usa Google Directions cuando hay API key).
  */
 export function estimateEtaMinutes(distanceKm: number, avgSpeedKmh = 28): number {
   if (distanceKm <= 0) return 0;

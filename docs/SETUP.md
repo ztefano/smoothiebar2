@@ -26,11 +26,45 @@ cp .env.example .env
 
 Completá `.env` con:
 - `EXPO_PUBLIC_SUPABASE_URL` / `EXPO_PUBLIC_SUPABASE_ANON_KEY` (paso 1).
-- `EXPO_PUBLIC_GOOGLE_MAPS_API_KEY`: clave de Google Maps SDK for Android
-  (Google Cloud Console → habilitar "Maps SDK for Android"). En iOS se usa
-  Apple Maps por defecto, no hace falta clave.
+- `EXPO_PUBLIC_GOOGLE_MAPS_API_KEY`: clave de Google Cloud Console con estas
+  APIs habilitadas (todas en el mismo proyecto de Google Cloud, la misma
+  clave sirve para las cuatro):
+  - **Maps SDK for Android** (obligatoria en Android; sin esto la app se
+    cierra sola al abrir cualquier pantalla con mapa). En iOS se usa Apple
+    Maps por defecto, no hace falta clave.
+  - **Directions API**: ETA/distancia real por calles entre el chofer y el
+    punto de encuentro (`src/lib/directions.ts`, `useDirectionsEta`). Sin
+    esta API, la app usa un cálculo aproximado en línea recta como
+    fallback — no rompe nada, solo es menos preciso.
+  - **Places API**: autocompletado de direcciones al escribir
+    (`src/lib/places.ts`, `AddressAutocomplete`). Sin esta API, el campo de
+    dirección sigue funcionando como texto libre, simplemente sin
+    sugerencias.
 - `EXPO_PUBLIC_APP_SCHEME`: esquema de deep link (por defecto
-  `choferdereemplazo`), usado para volver del checkout de pago.
+  `choferdereemplazo`), usado para volver del checkout de pago y del login
+  con Google.
+
+### Login con Google (opcional)
+
+1. En Google Cloud Console → **APIs & Services → Credentials → Create
+   Credentials → OAuth client ID**. Si te lo pide, configurá antes la
+   "OAuth consent screen" (tipo External, no hace falta publicarla para
+   pruebas).
+2. Tipo de aplicación: **Web application**.
+3. En **Authorized redirect URIs** agregá:
+   ```
+   https://TU-PROYECTO.supabase.co/auth/v1/callback
+   ```
+4. Copiá el **Client ID** y **Client Secret** generados.
+5. En Supabase Dashboard → **Authentication → Providers → Google**:
+   activalo y pegá esas dos credenciales.
+
+No hace falta ninguna otra configuración en la app: `signInWithGoogle` (en
+`src/state/AuthContext.tsx`) abre el flujo OAuth con `expo-web-browser` y
+usa el mismo `scheme` de deep link ya configurado. La primera vez que
+alguien entra por Google, como no viene con teléfono/rol definidos, se lo
+manda a `app/(auth)/complete-profile.tsx` para completarlos antes de
+seguir.
 
 Correr en desarrollo:
 ```bash

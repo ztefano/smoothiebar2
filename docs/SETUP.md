@@ -121,6 +121,32 @@ Al terminar (uns 10-20 min), la terminal te da un link para descargar el
 `.apk`. Abrilo desde el teléfono (puede pedirte habilitar "instalar apps de
 orígenes desconocidos") para instalarlo.
 
+## 6.1 Actualizaciones OTA (sin recompilar el APK)
+
+El proyecto ya está configurado con `expo-updates` y un `projectId` de EAS
+(`app/app.config.js` → `extra.eas.projectId` / `updates.url`), y cada
+perfil de `eas.json` tiene un `channel` (`development` / `preview` /
+`production`). Esto permite publicar cambios de **solo JS/TS** (pantallas,
+lógica, textos — nada que agregue una librería nativa nueva) directo a los
+APKs ya instalados, sin generar un `.apk` nuevo ni reinstalar nada:
+
+```bash
+cd app
+eas update --branch preview --message "descripción del cambio"
+```
+
+Esto sí requiere correr el comando desde una terminal (CLI) — no hay un
+botón equivalente en el dashboard web para esto. Si querés que se dispare
+solo con cada push a GitHub (sin que nadie corra el comando a mano),
+explorá **"Flujos de trabajo de EAS"** en el dashboard del proyecto — está
+pensado exactamente para eso, con su propio asistente guiado.
+
+Si el cambio agrega una librería nativa nueva, cambia permisos, o toca
+`app.config.js` en la parte nativa (ios/android), una actualización OTA
+**no alcanza**: hay que volver a compilar con `eas build` (sección 6).
+
+## 7. Compilar para iOS
+
 Para iOS no existe el equivalente al `.apk`: instalar en un iPhone sin pasar
 por la App Store requiere sí o sí una cuenta de Apple Developer (99 USD/año)
 y `eas build --platform ios --profile preview`.
@@ -129,7 +155,7 @@ Un *development build* (`eas build --profile development`) además habilita
 el rastreo de ubicación en segundo plano para los choferes, que Expo Go no
 soporta.
 
-## 7. Publicar en las tiendas
+## 8. Publicar en las tiendas
 
 - **Android**: `eas build --platform android --profile production` y subir
   el `.aab` a Google Play Console.

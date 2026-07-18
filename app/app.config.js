@@ -11,6 +11,12 @@ module.exports = ({ config }) => ({
   splash: {
     backgroundColor: "#111827",
   },
+  runtimeVersion: {
+    policy: "appVersion",
+  },
+  updates: {
+    url: "https://u.expo.dev/8824ad6e-52bb-4427-af9b-5dd7f80fde5e",
+  },
   plugins: [
     "expo-router",
     [
@@ -46,6 +52,9 @@ module.exports = ({ config }) => ({
   extra: {
     router: {
       origin: false,
+    },
+    eas: {
+      projectId: "8824ad6e-52bb-4427-af9b-5dd7f80fde5e",
     },
   },
 });

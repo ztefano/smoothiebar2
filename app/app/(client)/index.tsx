@@ -14,12 +14,15 @@ import { useCurrentLocation } from "@/hooks/useLocation";
 import { MapPicker } from "@/components/MapPicker";
 import { AddressField } from "@/components/AddressField";
 import { VehicleQuickSelect, type VehicleParts } from "@/components/VehicleQuickSelect";
+import { DateTimeField } from "@/components/DateTimeField";
 import { supabase } from "@/lib/supabase";
 import { estimatePrice, formatEuros } from "@/lib/pricing";
 import { formatVehicleParts } from "@/hooks/useVehicles";
 import type { Coordinates } from "@/types";
 
-export default function RequestNowScreen() {
+const MIN_LEAD_TIME_MS = 2 * 60 * 60 * 1000; // los choferes se piden con 2h de anticipación mínima
+
+export default function RequestChoferScreen() {
   const { profile } = useAuth();
   const { location, errorMsg } = useCurrentLocation();
   const [pickup, setPickup] = useState<Coordinates | null>(null);
@@ -27,16 +30,27 @@ export default function RequestNowScreen() {
   const [dropoffAddress, setDropoffAddress] = useState("");
   const [dropoff, setDropoff] = useState<Coordinates | null>(null);
   const [vehicle, setVehicle] = useState<VehicleParts>({ brand: "", model: "", plate: "" });
+  const [scheduledAt, setScheduledAt] = useState(() => new Date(Date.now() + MIN_LEAD_TIME_MS));
   const [submitting, setSubmitting] = useState(false);
 
   const effectivePickup = pickup ?? location;
-  const priceEstimate = effectivePickup ? estimatePrice(effectivePickup, dropoff) : null;
+  const minimumDate = new Date(Date.now() + MIN_LEAD_TIME_MS);
+  const priceEstimate = effectivePickup
+    ? estimatePrice(effectivePickup, dropoff, scheduledAt)
+    : null;
   const vehicleInfo = formatVehicleParts(vehicle.brand, vehicle.model, vehicle.plate);
 
   async function handleRequest() {
     if (!profile || !effectivePickup) return;
     if (!address.trim() || !dropoffAddress.trim() || !dropoff || !vehicleInfo) {
       Alert.alert("Faltan datos", "Ingresá el punto de encuentro, el destino y los datos del vehículo.");
+      return;
+    }
+    if (scheduledAt.getTime() < minimumDate.getTime()) {
+      Alert.alert(
+        "Fecha inválida",
+        "Los choferes se piden con al menos 2 horas de anticipación. Elegí un horario más adelante."
+      );
       return;
     }
 
@@ -55,12 +69,13 @@ export default function RequestNowScreen() {
           dropoff_lng: dropoff?.lng ?? null,
           vehicle_info: vehicleInfo,
           price_estimate: priceEstimate,
-          scheduled_at: null,
+          scheduled_at: scheduledAt.toISOString(),
         })
         .select("id")
         .single();
 
       if (error) throw error;
+      Alert.alert("Listo", "Tu pedido quedó registrado. Te avisaremos cuando un chofer lo acepte.");
       router.push(`/(client)/trip/${data.id}`);
     } catch (err) {
       Alert.alert("No se pudo crear el pedido", (err as Error).message);
@@ -90,7 +105,8 @@ export default function RequestNowScreen() {
     <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
       <Text style={styles.title}>Pedí tu chofer de reemplazo</Text>
       <Text style={styles.subtitle}>
-        Un chofer va hasta tu ubicación y maneja tu propio auto de vuelta a casa.
+        Un chofer va hasta tu ubicación y maneja tu propio auto de vuelta a casa. Se piden con al
+        menos 2 horas de anticipación.
       </Text>
 
       <AddressField
@@ -120,6 +136,13 @@ export default function RequestNowScreen() {
 
       <VehicleQuickSelect clientId={profile?.id ?? null} value={vehicle} onChange={setVehicle} />
 
+      <DateTimeField
+        label="Fecha y hora del servicio"
+        value={scheduledAt}
+        minimumDate={minimumDate}
+        onChange={setScheduledAt}
+      />
+
       {priceEstimate ? (
         <Text style={styles.price}>Tarifa estimada: {formatEuros(priceEstimate)}</Text>
       ) : null}
@@ -128,7 +151,7 @@ export default function RequestNowScreen() {
         {submitting ? (
           <ActivityIndicator color="white" />
         ) : (
-          <Text style={styles.buttonText}>Pedir chofer ahora</Text>
+          <Text style={styles.buttonText}>Pedir chofer</Text>
         )}
       </Pressable>
     </ScrollView>

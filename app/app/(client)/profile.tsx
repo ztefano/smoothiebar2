@@ -1,10 +1,9 @@
 import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import { router } from "expo-router";
 import { useAuth } from "@/state/AuthContext";
-import { AvatarPicker } from "@/components/AvatarPicker";
 
 export default function ClientProfileScreen() {
-  const { profile, session, signOut, refreshProfile } = useAuth();
+  const { profile, session, signOut } = useAuth();
 
   async function handleSignOut() {
     await signOut();
@@ -13,14 +12,6 @@ export default function ClientProfileScreen() {
 
   return (
     <View style={styles.container}>
-      {profile ? (
-        <AvatarPicker
-          userId={profile.id}
-          avatarUrl={profile.avatar_url}
-          fullName={profile.full_name}
-          onUploaded={refreshProfile}
-        />
-      ) : null}
       <Text style={styles.name}>
         {profile?.full_name} {profile?.last_name}
       </Text>

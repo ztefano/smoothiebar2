@@ -27,6 +27,12 @@ module.exports = ({ config }) => ({
           "Permitir que la app use tu ubicación para asignarte viajes cercanos y compartir tu posición con el cliente mientras el viaje está activo.",
       },
     ],
+    [
+      "expo-image-picker",
+      {
+        photosPermission: "Permitir el acceso a tus fotos para elegir tu foto de perfil.",
+      },
+    ],
   ],
   ios: {
     supportsTablet: false,

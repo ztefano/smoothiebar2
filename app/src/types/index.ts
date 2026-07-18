@@ -13,6 +13,7 @@ export interface Profile {
   id: string;
   full_name: string;
   last_name: string | null;
+  avatar_url: string | null;
   phone: string | null;
   role: UserRole;
   is_online: boolean;

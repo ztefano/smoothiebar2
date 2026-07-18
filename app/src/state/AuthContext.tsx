@@ -37,23 +37,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .eq("id", userId)
       .single();
 
-    if (!error) setProfile(data as Profile);
+    setProfile(!error ? (data as Profile) : null);
   }
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
+    supabase.auth.getSession().then(async ({ data }) => {
       setSession(data.session);
-      if (data.session) loadProfile(data.session.user.id);
+      if (data.session) await loadProfile(data.session.user.id);
       setLoading(false);
     });
 
+    // "loading" también se vuelve a activar en cada login/logout, no solo al
+    // arrancar la app: si no, justo después de loguearse hay un instante en
+    // el que session ya existe pero el perfil todavía no terminó de cargar
+    // (loadProfile es async), y las pantallas que redirigen a /login cuando
+    // "no hay perfil" te mandaban de vuelta ahí por error.
     const { data: subscription } = supabase.auth.onAuthStateChange(
       (_event, newSession) => {
         setSession(newSession);
         if (newSession) {
-          loadProfile(newSession.user.id);
+          setLoading(true);
+          loadProfile(newSession.user.id).finally(() => setLoading(false));
         } else {
           setProfile(null);
+          setLoading(false);
         }
       }
     );

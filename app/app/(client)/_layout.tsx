@@ -10,6 +10,8 @@ export default function ClientLayout() {
         <Tabs.Screen name="history" options={{ title: "Historial" }} />
         <Tabs.Screen name="profile" options={{ title: "Perfil" }} />
         <Tabs.Screen name="trip/[bookingId]" options={{ href: null, title: "Viaje" }} />
+        <Tabs.Screen name="vehicles" options={{ href: null, title: "Mis vehículos" }} />
+        <Tabs.Screen name="addresses" options={{ href: null, title: "Mis direcciones" }} />
       </Tabs>
     </RoleGate>
   );

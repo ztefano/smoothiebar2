@@ -10,7 +10,6 @@ import {
   View,
 } from "react-native";
 import { useAuth } from "@/state/AuthContext";
-import type { UserRole } from "@/types";
 
 export default function RegisterScreen() {
   const { signUp, signInWithGoogle } = useAuth();
@@ -18,7 +17,6 @@ export default function RegisterScreen() {
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState<UserRole>("client");
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
 
@@ -46,7 +44,7 @@ export default function RegisterScreen() {
         password,
         fullName,
         phone,
-        role,
+        role: "client",
       });
       if (needsEmailConfirmation) {
         Alert.alert(
@@ -67,25 +65,10 @@ export default function RegisterScreen() {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Creá tu cuenta</Text>
-
-      <View style={styles.roleSwitch}>
-        <Pressable
-          style={[styles.roleButton, role === "client" && styles.roleButtonActive]}
-          onPress={() => setRole("client")}
-        >
-          <Text style={[styles.roleText, role === "client" && styles.roleTextActive]}>
-            Soy cliente
-          </Text>
-        </Pressable>
-        <Pressable
-          style={[styles.roleButton, role === "driver" && styles.roleButtonActive]}
-          onPress={() => setRole("driver")}
-        >
-          <Text style={[styles.roleText, role === "driver" && styles.roleTextActive]}>
-            Soy chofer
-          </Text>
-        </Pressable>
-      </View>
+      <Text style={styles.subtitle}>
+        Este registro es para clientes. Si sos chofer, pedile a tu administrador que te cree la
+        cuenta e iniciá sesión desde "Soy chofer" en la pantalla de login.
+      </Text>
 
       <TextInput style={styles.input} placeholder="Nombre completo" value={fullName} onChangeText={setFullName} />
       <TextInput style={styles.input} placeholder="Teléfono" keyboardType="phone-pad" value={phone} onChangeText={setPhone} />
@@ -126,19 +109,8 @@ export default function RegisterScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, justifyContent: "center", padding: 24, gap: 12, backgroundColor: "white" },
-  title: { fontSize: 24, fontWeight: "800", color: "#111827", textAlign: "center", marginBottom: 8 },
-  roleSwitch: { flexDirection: "row", gap: 8, marginBottom: 8 },
-  roleButton: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    alignItems: "center",
-  },
-  roleButtonActive: { backgroundColor: "#111827", borderColor: "#111827" },
-  roleText: { fontWeight: "600", color: "#374151" },
-  roleTextActive: { color: "white" },
+  title: { fontSize: 24, fontWeight: "800", color: "#111827", textAlign: "center", marginBottom: 4 },
+  subtitle: { fontSize: 13, color: "#6B7280", textAlign: "center", marginBottom: 8 },
   input: {
     borderWidth: 1,
     borderColor: "#E5E7EB",

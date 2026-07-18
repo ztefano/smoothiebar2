@@ -7,13 +7,13 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from "react-native";
 import { useAuth } from "@/state/AuthContext";
 import { useCurrentLocation } from "@/hooks/useLocation";
 import { MapPicker } from "@/components/MapPicker";
-import { AddressAutocomplete } from "@/components/AddressAutocomplete";
+import { AddressField } from "@/components/AddressField";
+import { VehicleQuickSelect } from "@/components/VehicleQuickSelect";
 import { supabase } from "@/lib/supabase";
 import { estimatePrice, formatEuros } from "@/lib/pricing";
 import type { Coordinates } from "@/types";
@@ -23,11 +23,13 @@ export default function RequestNowScreen() {
   const { location, errorMsg } = useCurrentLocation();
   const [pickup, setPickup] = useState<Coordinates | null>(null);
   const [address, setAddress] = useState("");
+  const [dropoffAddress, setDropoffAddress] = useState("");
+  const [dropoff, setDropoff] = useState<Coordinates | null>(null);
   const [vehicleInfo, setVehicleInfo] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   const effectivePickup = pickup ?? location;
-  const priceEstimate = effectivePickup ? estimatePrice(effectivePickup, null) : null;
+  const priceEstimate = effectivePickup ? estimatePrice(effectivePickup, dropoff) : null;
 
   async function handleRequest() {
     if (!profile || !effectivePickup) return;
@@ -46,6 +48,9 @@ export default function RequestNowScreen() {
           pickup_address: address.trim(),
           pickup_lat: effectivePickup.lat,
           pickup_lng: effectivePickup.lng,
+          dropoff_address: dropoffAddress.trim() || null,
+          dropoff_lat: dropoff?.lat ?? null,
+          dropoff_lng: dropoff?.lng ?? null,
           vehicle_info: vehicleInfo.trim(),
           price_estimate: priceEstimate,
           scheduled_at: null,
@@ -80,13 +85,15 @@ export default function RequestNowScreen() {
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
+    <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
       <Text style={styles.title}>Pedí tu chofer de reemplazo</Text>
       <Text style={styles.subtitle}>
         Un chofer va hasta tu ubicación y maneja tu propio auto de vuelta a casa.
       </Text>
 
-      <AddressAutocomplete
+      <AddressField
+        clientId={profile?.id ?? null}
+        label="Punto de encuentro"
         value={address}
         onChangeText={setAddress}
         onSelectPlace={({ coords }) => setPickup(coords)}
@@ -94,14 +101,22 @@ export default function RequestNowScreen() {
       />
 
       <MapPicker
-        label="Ubicación de encuentro"
+        label="Ajustar ubicación en el mapa"
         initialLocation={effectivePickup}
         onChange={setPickup}
       />
 
-      <TextInput
-        style={styles.input}
-        placeholder="Datos del vehículo (marca, modelo, patente)"
+      <AddressField
+        clientId={profile?.id ?? null}
+        label="Destino (opcional)"
+        value={dropoffAddress}
+        onChangeText={setDropoffAddress}
+        onSelectPlace={({ coords }) => setDropoff(coords)}
+        placeholder="¿A dónde vas? (ej: Casa)"
+      />
+
+      <VehicleQuickSelect
+        clientId={profile?.id ?? null}
         value={vehicleInfo}
         onChangeText={setVehicleInfo}
       />
@@ -126,14 +141,6 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
   title: { fontSize: 22, fontWeight: "800", color: "#111827" },
   subtitle: { fontSize: 13, color: "#6B7280", marginBottom: 4 },
-  input: {
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 15,
-  },
   price: { fontSize: 16, fontWeight: "700", color: "#111827" },
   button: { backgroundColor: "#111827", borderRadius: 10, paddingVertical: 14, alignItems: "center" },
   buttonText: { color: "white", fontWeight: "700", fontSize: 15 },

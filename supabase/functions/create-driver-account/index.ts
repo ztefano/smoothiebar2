@@ -1,0 +1,67 @@
+// Edge Function: crea una cuenta de chofer. Solo puede llamarla un usuario
+// autenticado con profiles.is_admin = true. El chofer creado no pasa por
+// registro propio: entra directo con el email/contraseña que le da el admin.
+import { createClient } from "npm:@supabase/supabase-js@2.45.4";
+import { corsHeaders, createAdminClient } from "../_shared/supabaseAdmin.ts";
+
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+
+  try {
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) throw new Error("Falta autenticación.");
+
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
+    if (!supabaseUrl || !anonKey) throw new Error("Falta configuración del proyecto.");
+
+    // Cliente con la identidad de quien llama, para validar que sea admin.
+    const callerClient = createClient(supabaseUrl, anonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
+
+    const {
+      data: { user: caller },
+    } = await callerClient.auth.getUser();
+    if (!caller) throw new Error("No autenticado.");
+
+    const { data: callerProfile } = await callerClient
+      .from("profiles")
+      .select("is_admin")
+      .eq("id", caller.id)
+      .single();
+
+    if (!callerProfile?.is_admin) {
+      return new Response(JSON.stringify({ error: "No autorizado." }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const { fullName, phone, email, password } = await req.json();
+    if (!fullName || !email || !password) throw new Error("Faltan datos del chofer.");
+
+    const admin = createAdminClient();
+    const { data: created, error } = await admin.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true, // el chofer puede loguearse de inmediato, sin confirmar mail
+      user_metadata: {
+        full_name: fullName,
+        phone: phone ?? null,
+        role: "driver",
+      },
+    });
+
+    if (error) throw error;
+
+    return new Response(JSON.stringify({ userId: created.user.id }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  } catch (err) {
+    return new Response(JSON.stringify({ error: (err as Error).message }), {
+      status: 400,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+});

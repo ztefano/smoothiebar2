@@ -15,6 +15,27 @@ export interface Profile {
   phone: string | null;
   role: UserRole;
   is_online: boolean;
+  is_admin: boolean;
+  created_at: string;
+}
+
+export interface Vehicle {
+  id: string;
+  client_id: string;
+  label: string;
+  brand: string | null;
+  model: string | null;
+  plate: string | null;
+  created_at: string;
+}
+
+export interface SavedAddress {
+  id: string;
+  client_id: string;
+  label: string;
+  address: string;
+  lat: number;
+  lng: number;
   created_at: string;
 }
 
@@ -49,7 +70,7 @@ export interface Payment {
   id: string;
   booking_id: string;
   provider: PaymentProvider;
-  preference_id: string | null;
+  external_reference: string | null;
   status: PaymentStatus;
   amount: number;
   raw_payload: Record<string, unknown> | null;

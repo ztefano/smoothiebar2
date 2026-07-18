@@ -16,6 +16,15 @@ export default function ClientProfileScreen() {
       <Text style={styles.meta}>{profile?.phone}</Text>
       <Text style={styles.role}>Cliente</Text>
 
+      <Pressable style={styles.linkRow} onPress={() => router.push("/(client)/vehicles")}>
+        <Text style={styles.linkText}>Mis vehículos</Text>
+        <Text style={styles.linkArrow}>→</Text>
+      </Pressable>
+      <Pressable style={styles.linkRow} onPress={() => router.push("/(client)/addresses")}>
+        <Text style={styles.linkText}>Mis direcciones</Text>
+        <Text style={styles.linkArrow}>→</Text>
+      </Pressable>
+
       <Pressable
         style={styles.signOut}
         onPress={() => Alert.alert("Cerrar sesión", "¿Seguro que querés salir?", [
@@ -34,6 +43,16 @@ const styles = StyleSheet.create({
   name: { fontSize: 22, fontWeight: "800", color: "#111827" },
   meta: { fontSize: 14, color: "#6B7280" },
   role: { fontSize: 13, fontWeight: "600", color: "#2563EB", marginBottom: 24 },
+  linkRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: "#E5E7EB",
+  },
+  linkText: { fontSize: 15, fontWeight: "600", color: "#111827" },
+  linkArrow: { fontSize: 15, color: "#9CA3AF" },
   signOut: {
     marginTop: "auto",
     borderRadius: 10,

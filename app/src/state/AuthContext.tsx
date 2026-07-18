@@ -121,7 +121,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!data.url) throw new Error("No se pudo iniciar el login con Google.");
 
     const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
-    if (result.type !== "success") return; // el usuario canceló
+    if (result.type !== "success") {
+      throw new Error(
+        `El navegador se cerró sin completar el login con Google (motivo: ${result.type}). ` +
+          `Si esto pasa siempre, revisá que "${redirectTo}" esté en Authentication → URL ` +
+          `Configuration → Redirect URLs de Supabase.`
+      );
+    }
 
     const url = new URL(result.url);
     const code = url.searchParams.get("code");

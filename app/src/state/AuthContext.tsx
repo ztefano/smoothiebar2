@@ -97,7 +97,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function signInWithGoogle() {
-    const redirectTo = Linking.createURL("auth/callback");
+    // Volvemos a la raíz de la app (no a una ruta ficticia como
+    // "auth/callback", que no existe como pantalla) para evitar que el
+    // router intente resolverla como navegación y muestre "Unmatched
+    // Route" por una fracción de segundo al volver del navegador.
+    const redirectTo = Linking.createURL("/");
 
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: "google",

@@ -34,6 +34,7 @@ export default function RequestChoferScreen() {
   const { location, errorMsg } = useCurrentLocation();
   const [step, setStep] = useState<"form" | "confirm">("form");
   const [pickup, setPickup] = useState<Coordinates | null>(null);
+  const [pickupSource, setPickupSource] = useState<"current_location" | "manual">("current_location");
   const [address, setAddress] = useState("");
   const [dropoffAddress, setDropoffAddress] = useState("");
   const [dropoff, setDropoff] = useState<Coordinates | null>(null);
@@ -252,7 +253,10 @@ export default function RequestChoferScreen() {
         label="Punto de encuentro"
         value={address}
         onChangeText={setAddress}
-        onSelectPlace={({ coords }) => setPickup(coords)}
+        onSelectPlace={({ coords, source }) => {
+          setPickup(coords);
+          setPickupSource(source);
+        }}
         placeholder="Dirección (ej: Av. Providencia 1234, depto 5)"
         currentLocation={location}
       />
@@ -260,7 +264,11 @@ export default function RequestChoferScreen() {
       <MapPicker
         label="Ajustar ubicación en el mapa"
         initialLocation={effectivePickup}
-        onChange={setPickup}
+        onChange={(coords) => {
+          setPickup(coords);
+          setPickupSource("manual");
+        }}
+        showLiveLocation={pickupSource === "current_location"}
       />
 
       <AddressField

@@ -134,5 +134,7 @@ export interface VehicleInspection {
   damages: DamageEntry[];
   client_confirmation_name: string | null;
   confirmed_at: string | null;
+  return_confirmation_name: string | null;
+  return_confirmed_at: string | null;
   created_at: string;
 }

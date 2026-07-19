@@ -6,12 +6,19 @@ import { AddressAutocomplete } from "@/components/AddressAutocomplete";
 import { reverseGeocode } from "@/lib/places";
 import type { Coordinates } from "@/types";
 
+export interface AddressSelection {
+  address: string;
+  coords: Coordinates;
+  /** "current_location" = vino del GPS (no se debe poder arrastrar el pin). */
+  source: "current_location" | "manual";
+}
+
 interface AddressFieldProps {
   clientId: string | null;
   label: string;
   value: string;
   onChangeText: (text: string) => void;
-  onSelectPlace: (result: { address: string; coords: Coordinates }) => void;
+  onSelectPlace: (result: AddressSelection) => void;
   placeholder?: string;
   /** Si se pasa, muestra un chip "Mi ubicación actual" que usa esta posición. */
   currentLocation?: Coordinates | null;
@@ -38,7 +45,7 @@ export function AddressField({
       // El pin/coordenadas siempre son reales (vienen del GPS); lo que
       // puede fallar es solo la conversión a texto legible. Nunca hay que
       // guardar un texto inventado como si fuera la dirección real.
-      onSelectPlace({ address: address ?? "", coords: currentLocation });
+      onSelectPlace({ address: address ?? "", coords: currentLocation, source: "current_location" });
       if (address) {
         onChangeText(address);
       } else {
@@ -74,7 +81,11 @@ export function AddressField({
             style={styles.chip}
             onPress={() => {
               onChangeText(saved.address);
-              onSelectPlace({ address: saved.address, coords: { lat: saved.lat, lng: saved.lng } });
+              onSelectPlace({
+                address: saved.address,
+                coords: { lat: saved.lat, lng: saved.lng },
+                source: "manual",
+              });
             }}
           >
             <Text style={styles.chipText}>{saved.label}</Text>
@@ -88,7 +99,7 @@ export function AddressField({
       <AddressAutocomplete
         value={value}
         onChangeText={onChangeText}
-        onSelectPlace={onSelectPlace}
+        onSelectPlace={(result) => onSelectPlace({ ...result, source: "manual" })}
         placeholder={placeholder}
       />
     </View>

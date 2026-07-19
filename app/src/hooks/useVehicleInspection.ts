@@ -44,5 +44,18 @@ export function useVehicleInspection(bookingId: string | null) {
     await reload();
   }
 
-  return { inspection, loading, save };
+  async function saveReturn(returnConfirmationName: string) {
+    if (!bookingId) return;
+    const { error } = await supabase
+      .from("vehicle_inspections")
+      .update({
+        return_confirmation_name: returnConfirmationName,
+        return_confirmed_at: new Date().toISOString(),
+      })
+      .eq("booking_id", bookingId);
+    if (error) throw error;
+    await reload();
+  }
+
+  return { inspection, loading, save, saveReturn };
 }

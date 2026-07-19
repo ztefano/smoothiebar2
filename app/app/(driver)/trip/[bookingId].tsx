@@ -1,5 +1,14 @@
 import { useLocalSearchParams, router } from "expo-router";
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import {
+  ActivityIndicator,
+  Alert,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/state/AuthContext";
 import { useBooking } from "@/hooks/useBooking";
@@ -14,6 +23,7 @@ import { confirmCashPayment } from "@/lib/payments";
 import { formatEuros } from "@/lib/pricing";
 import { supabase } from "@/lib/supabase";
 import { haversineDistanceKm } from "@/lib/distance";
+import { openGoogleMapsNavigation, openWazeNavigation } from "@/lib/externalNav";
 import type { Coordinates, DamageEntry, InspectionGeneralStatus } from "@/types";
 
 interface ClientInfo {
@@ -28,14 +38,16 @@ export default function DriverTripScreen() {
   const { profile } = useAuth();
   const { bookingId } = useLocalSearchParams<{ bookingId: string }>();
   const { booking, loading, updateStatus } = useBooking(bookingId ?? null);
-  const { payment } = usePayment(booking?.status === "completed" ? booking.id : null);
-  const { inspection, save: saveInspection } = useVehicleInspection(bookingId ?? null);
+  const { payment } = usePayment(booking ? booking.id : null);
+  const { inspection, save: saveInspection, saveReturn } = useVehicleInspection(bookingId ?? null);
   const [myLocation, setMyLocation] = useState<Coordinates | null>(null);
   const [client, setClient] = useState<ClientInfo | null>(null);
   const [damages, setDamages] = useState<DamageEntry[]>([]);
   const [generalStatus, setGeneralStatus] = useState<InspectionGeneralStatus | null>(null);
   const [clientName, setClientName] = useState("");
+  const [returnClientName, setReturnClientName] = useState("");
   const [confirming, setConfirming] = useState(false);
+  const [finishing, setFinishing] = useState(false);
   const [forceShowFinish, setForceShowFinish] = useState(false);
 
   const isSharingLocation = booking?.status === "accepted" || booking?.status === "in_progress";
@@ -91,11 +103,37 @@ export default function DriverTripScreen() {
     }
   }
 
-  async function handleComplete() {
+  async function handleFinalize() {
+    if (!returnClientName.trim()) {
+      Alert.alert(
+        "Falta la conformidad",
+        "Pedile al cliente que escriba su nombre confirmando que el coche no sufrió daños."
+      );
+      return;
+    }
+    setFinishing(true);
     try {
-      await updateStatus("completed");
+      await saveReturn(returnClientName.trim());
+      if (payment?.provider === "cash" && payment.status !== "approved") {
+        Alert.alert(
+          "Cobrá el viaje",
+          `Recordá cobrarle ${formatEuros(booking!.price_estimate)} en efectivo al cliente.`,
+          [
+            {
+              text: "Entendido",
+              onPress: () => {
+                updateStatus("completed").catch((err) => Alert.alert("Error", (err as Error).message));
+              },
+            },
+          ]
+        );
+      } else {
+        await updateStatus("completed");
+      }
     } catch (err) {
       Alert.alert("Error", (err as Error).message);
+    } finally {
+      setFinishing(false);
     }
   }
 
@@ -156,6 +194,17 @@ export default function DriverTripScreen() {
         showsOwnLocation
       />
 
+      {isSharingLocation ? (
+        <View style={styles.navRow}>
+          <Pressable style={styles.navButton} onPress={() => openGoogleMapsNavigation(target)}>
+            <Text style={styles.navButtonText}>🧭 Navegar con Google Maps</Text>
+          </Pressable>
+          <Pressable style={styles.navButton} onPress={() => openWazeNavigation(target)}>
+            <Text style={styles.navButtonText}>🚗 Navegar con Waze</Text>
+          </Pressable>
+        </View>
+      ) : null}
+
       <ScrollView style={styles.footer} contentContainerStyle={styles.footerContent}>
         {client ? (
           <Text style={styles.clientName}>
@@ -197,14 +246,36 @@ export default function DriverTripScreen() {
           <>
             {inspection ? (
               <Text style={styles.inspectionSummary}>
-                Revisión conforme por {inspection.client_confirmation_name}
+                Revisión de salida conforme por {inspection.client_confirmation_name}
                 {inspection.damages.length > 0 ? ` · ${inspection.damages.length} desperfecto(s) registrados` : ""}
               </Text>
             ) : null}
+
             {hasArrived || forceShowFinish ? (
-              <Pressable style={[styles.button, styles.completeButton]} onPress={handleComplete}>
-                <Text style={styles.buttonText}>Finalizar viaje</Text>
-              </Pressable>
+              <View style={styles.inspectionBlock}>
+                <Text style={styles.inspectionTitle}>Antes de terminar</Text>
+                <Text style={styles.hint}>
+                  Pedile al cliente que escriba su nombre confirmando que el coche no sufrió daños
+                  durante el trayecto.
+                </Text>
+                <TextInput
+                  style={styles.signatureInput}
+                  placeholder="Nombre y apellido del cliente"
+                  value={returnClientName}
+                  onChangeText={setReturnClientName}
+                />
+                <Pressable
+                  style={[styles.button, styles.completeButton]}
+                  onPress={handleFinalize}
+                  disabled={finishing}
+                >
+                  {finishing ? (
+                    <ActivityIndicator color="white" />
+                  ) : (
+                    <Text style={styles.buttonText}>Finalizar viaje</Text>
+                  )}
+                </Pressable>
+              </View>
             ) : (
               <Pressable onPress={() => setForceShowFinish(true)}>
                 <Text style={styles.arrivalHint}>
@@ -230,6 +301,16 @@ export default function DriverTripScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
+  navRow: { flexDirection: "row", gap: 8, padding: 10, backgroundColor: "white" },
+  navButton: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    borderRadius: 8,
+    paddingVertical: 10,
+    alignItems: "center",
+  },
+  navButtonText: { fontSize: 12, fontWeight: "700", color: "#111827" },
   footer: { backgroundColor: "white" },
   footerContent: { padding: 20, gap: 6 },
   clientName: { fontSize: 15, fontWeight: "700", color: "#2563EB" },
@@ -253,4 +334,15 @@ const styles = StyleSheet.create({
   inspectionTitle: { fontSize: 15, fontWeight: "800", color: "#111827" },
   inspectionSummary: { fontSize: 12, color: "#6B7280", marginTop: 6 },
   arrivalHint: { fontSize: 13, color: "#2563EB", fontWeight: "600", textAlign: "center", marginTop: 10 },
+  hint: { fontSize: 12, color: "#6B7280" },
+  signatureInput: {
+    borderWidth: 1,
+    borderColor: "#111827",
+    borderStyle: "dashed",
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 16,
+    fontSize: 17,
+    fontStyle: "italic",
+  },
 });

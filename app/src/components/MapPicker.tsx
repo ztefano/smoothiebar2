@@ -7,10 +7,15 @@ interface MapPickerProps {
   initialLocation: Coordinates;
   onChange: (coords: Coordinates) => void;
   label?: string;
+  /** true cuando el origen es el GPS: se muestra el punto azul de
+   * ubicación real, sin pin para arrastrar (no tiene sentido "corregir"
+   * dónde estás parado de verdad). */
+  showLiveLocation?: boolean;
 }
 
-/** Mapa donde el usuario arrastra un pin para elegir origen o destino. */
-export function MapPicker({ initialLocation, onChange, label }: MapPickerProps) {
+/** Mapa donde el usuario arrastra un pin para elegir origen o destino, o
+ * muestra el punto azul de ubicación real cuando el origen es el GPS. */
+export function MapPicker({ initialLocation, onChange, label, showLiveLocation }: MapPickerProps) {
   const mapRef = useRef<MapView>(null);
   const [marker, setMarker] = useState<LatLng>({
     latitude: initialLocation.lat,
@@ -40,23 +45,34 @@ export function MapPicker({ initialLocation, onChange, label }: MapPickerProps) 
         ref={mapRef}
         style={styles.map}
         initialRegion={region}
-        onPress={(e) => {
-          const coords = e.nativeEvent.coordinate;
-          setMarker(coords);
-          onChange({ lat: coords.latitude, lng: coords.longitude });
-        }}
+        showsUserLocation={showLiveLocation}
+        onPress={
+          showLiveLocation
+            ? undefined
+            : (e) => {
+                const coords = e.nativeEvent.coordinate;
+                setMarker(coords);
+                onChange({ lat: coords.latitude, lng: coords.longitude });
+              }
+        }
       >
-        <Marker
-          coordinate={marker}
-          draggable
-          onDragEnd={(e) => {
-            const coords = e.nativeEvent.coordinate;
-            setMarker(coords);
-            onChange({ lat: coords.latitude, lng: coords.longitude });
-          }}
-        />
+        {showLiveLocation ? null : (
+          <Marker
+            coordinate={marker}
+            draggable
+            onDragEnd={(e) => {
+              const coords = e.nativeEvent.coordinate;
+              setMarker(coords);
+              onChange({ lat: coords.latitude, lng: coords.longitude });
+            }}
+          />
+        )}
       </MapView>
-      <Text style={styles.hint}>Tocá el mapa o arrastrá el pin para ajustar la ubicación</Text>
+      <Text style={styles.hint}>
+        {showLiveLocation
+          ? "Se está usando tu ubicación real (GPS). Elegí una dirección para poder ajustarla a mano."
+          : "Tocá el mapa o arrastrá el pin para ajustar la ubicación"}
+      </Text>
     </View>
   );
 }

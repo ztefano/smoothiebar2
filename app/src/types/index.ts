@@ -125,6 +125,8 @@ export interface DamageEntry {
 }
 
 export type InspectionGeneralStatus = "ok" | "bad_condition" | "detail";
+export type ConfirmationMethod = "client_device" | "driver_device";
+export type ReturnStatus = "conforme" | "disputed" | "refused";
 
 export interface VehicleInspection {
   id: string;
@@ -134,7 +136,17 @@ export interface VehicleInspection {
   damages: DamageEntry[];
   client_confirmation_name: string | null;
   confirmed_at: string | null;
+  start_confirmation_method: ConfirmationMethod | null;
+  start_lat: number | null;
+  start_lng: number | null;
+  return_requested_at: string | null;
+  return_status: ReturnStatus | null;
+  return_note: string | null;
+  return_damages: DamageEntry[];
   return_confirmation_name: string | null;
   return_confirmed_at: string | null;
+  return_confirmation_method: ConfirmationMethod | null;
+  return_lat: number | null;
+  return_lng: number | null;
   created_at: string;
 }

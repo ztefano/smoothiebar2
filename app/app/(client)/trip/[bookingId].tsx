@@ -1,9 +1,13 @@
 import { useLocalSearchParams, router } from "expo-router";
-import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useAuth } from "@/state/AuthContext";
 import { useBooking } from "@/hooks/useBooking";
 import { useDriverLocation } from "@/hooks/useDriverLocation";
 import { usePayment } from "@/hooks/usePayment";
+import { useVehicleInspection } from "@/hooks/useVehicleInspection";
 import { LiveTrackingMap } from "@/components/LiveTrackingMap";
+import { StartInspectionReview } from "@/components/StartInspectionReview";
+import { ReturnInspectionReview } from "@/components/ReturnInspectionReview";
 import { requestCashPayment } from "@/lib/payments";
 import { formatEuros } from "@/lib/pricing";
 
@@ -16,9 +20,11 @@ const STATUS_COPY: Record<string, string> = {
 };
 
 export default function ClientTripScreen() {
+  const { profile } = useAuth();
   const { bookingId } = useLocalSearchParams<{ bookingId: string }>();
   const { booking, loading } = useBooking(bookingId ?? null);
   const { payment, loading: paymentLoading } = usePayment(booking ? booking.id : null);
+  const { inspection, confirmStart, confirmReturn } = useVehicleInspection(bookingId ?? null);
   const driverLocation = useDriverLocation(
     booking && booking.status !== "pending" ? booking.id : null
   );
@@ -42,6 +48,11 @@ export default function ClientTripScreen() {
     ? dropoff!
     : { lat: booking.pickup_lat, lng: booking.pickup_lng };
   const targetLabel = navigatingToDestination ? "Destino" : "Punto de encuentro";
+  const defaultName = `${profile?.full_name ?? ""} ${profile?.last_name ?? ""}`.trim();
+
+  const showStartReview = booking.status === "accepted" && !!inspection && !inspection.confirmed_at;
+  const showReturnReview =
+    booking.status === "in_progress" && !!inspection?.return_requested_at && !inspection.return_confirmed_at;
 
   function statusText() {
     if (booking!.status === "pending" && !paymentLoading) {
@@ -49,6 +60,8 @@ export default function ClientTripScreen() {
         ? "Pago recibido. Estamos por confirmar tu chofer."
         : "Confirmá el pago para asegurar tu reserva.";
     }
+    if (showStartReview) return "Confirmá el estado del vehículo antes de que el chofer arranque.";
+    if (showReturnReview) return "Confirmá cómo quedó el vehículo al finalizar.";
     return STATUS_COPY[booking!.status];
   }
 
@@ -93,6 +106,32 @@ export default function ClientTripScreen() {
     return <Text style={styles.pending}>Pago en proceso…</Text>;
   }
 
+  if (showStartReview && inspection) {
+    return (
+      <ScrollView style={styles.reviewScreen} contentContainerStyle={{ paddingVertical: 12 }}>
+        <StartInspectionReview
+          inspection={inspection}
+          defaultName={defaultName}
+          onConfirm={({ name, lat, lng }) => confirmStart({ name, method: "client_device", lat, lng })}
+        />
+      </ScrollView>
+    );
+  }
+
+  if (showReturnReview) {
+    return (
+      <ScrollView style={styles.reviewScreen} contentContainerStyle={{ paddingVertical: 12 }}>
+        <ReturnInspectionReview
+          bookingId={booking.id}
+          defaultName={defaultName}
+          onConfirm={({ status, note, damages, name, lat, lng }) =>
+            confirmReturn({ status, note, damages, name, method: "client_device", lat, lng })
+          }
+        />
+      </ScrollView>
+    );
+  }
+
   return (
     <View style={styles.container}>
       {showMap ? (
@@ -103,22 +142,24 @@ export default function ClientTripScreen() {
         </View>
       )}
 
-      <View style={styles.footer}>
+      <ScrollView style={styles.footerScroll} contentContainerStyle={styles.footer}>
         <Text style={styles.statusText}>{statusText()}</Text>
         <Text style={styles.meta}>{booking.pickup_address}</Text>
         <Text style={styles.meta}>Vehículo: {booking.vehicle_info}</Text>
         <Text style={styles.price}>{formatEuros(booking.price_estimate)}</Text>
 
         {renderPaymentSection()}
-      </View>
+      </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  reviewScreen: { flex: 1, backgroundColor: "white" },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
-  footer: { padding: 20, gap: 6, backgroundColor: "white" },
+  footerScroll: { maxHeight: 220, backgroundColor: "white" },
+  footer: { padding: 20, gap: 6 },
   statusText: { fontSize: 16, fontWeight: "700", color: "#111827" },
   meta: { fontSize: 13, color: "#6B7280" },
   price: { fontSize: 18, fontWeight: "800", color: "#111827", marginTop: 4 },

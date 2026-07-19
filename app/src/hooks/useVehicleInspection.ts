@@ -1,14 +1,22 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import type { DamageEntry, InspectionGeneralStatus, VehicleInspection } from "@/types";
+import type {
+  ConfirmationMethod,
+  DamageEntry,
+  InspectionGeneralStatus,
+  ReturnStatus,
+  VehicleInspection,
+} from "@/types";
 
+/** Inspección del vehículo de una reserva, con sincronización en tiempo
+ * real (el chofer y el cliente pueden estar mirando/editando a la vez
+ * desde sus propios teléfonos). */
 export function useVehicleInspection(bookingId: string | null) {
   const [inspection, setInspection] = useState<VehicleInspection | null>(null);
   const [loading, setLoading] = useState(true);
 
   const reload = useCallback(async () => {
     if (!bookingId) return;
-    setLoading(true);
     const { data } = await supabase
       .from("vehicle_inspections")
       .select("*")
@@ -19,14 +27,29 @@ export function useVehicleInspection(bookingId: string | null) {
   }, [bookingId]);
 
   useEffect(() => {
+    if (!bookingId) return;
+    setLoading(true);
     reload();
-  }, [reload]);
 
-  async function save(params: {
+    const channel = supabase
+      .channel(`inspection-${bookingId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "vehicle_inspections", filter: `booking_id=eq.${bookingId}` },
+        () => reload()
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [bookingId, reload]);
+
+  /** El chofer carga la revisión de salida (fotos/desperfectos), sin confirmar todavía. */
+  async function submitDriverInspection(params: {
     driverId: string;
     generalStatus: InspectionGeneralStatus;
     damages: DamageEntry[];
-    clientConfirmationName: string;
   }) {
     if (!bookingId) return;
     const { error } = await supabase.from("vehicle_inspections").upsert(
@@ -35,8 +58,6 @@ export function useVehicleInspection(bookingId: string | null) {
         driver_id: params.driverId,
         general_status: params.generalStatus,
         damages: params.damages,
-        client_confirmation_name: params.clientConfirmationName,
-        confirmed_at: new Date().toISOString(),
       },
       { onConflict: "booking_id" }
     );
@@ -44,18 +65,76 @@ export function useVehicleInspection(bookingId: string | null) {
     await reload();
   }
 
-  async function saveReturn(returnConfirmationName: string) {
+  /** Confirma la revisión de salida: desde el teléfono del cliente (lo normal)
+   * o, si no puede, desde el del chofer como respaldo (queda registrado cuál). */
+  async function confirmStart(params: {
+    name: string;
+    method: ConfirmationMethod;
+    lat: number | null;
+    lng: number | null;
+  }) {
     if (!bookingId) return;
     const { error } = await supabase
       .from("vehicle_inspections")
       .update({
-        return_confirmation_name: returnConfirmationName,
-        return_confirmed_at: new Date().toISOString(),
+        client_confirmation_name: params.name,
+        confirmed_at: new Date().toISOString(),
+        start_confirmation_method: params.method,
+        start_lat: params.lat,
+        start_lng: params.lng,
       })
       .eq("booking_id", bookingId);
     if (error) throw error;
     await reload();
   }
 
-  return { inspection, loading, save, saveReturn };
+  /** El chofer avisa que llegó al destino y pide la conformidad de vuelta. */
+  async function requestReturnConfirmation() {
+    if (!bookingId) return;
+    const { error } = await supabase
+      .from("vehicle_inspections")
+      .update({ return_requested_at: new Date().toISOString() })
+      .eq("booking_id", bookingId);
+    if (error) throw error;
+    await reload();
+  }
+
+  /** Cierra la conformidad de vuelta: conforme, no conforme (con
+   * observaciones/fotos), o el chofer deja constancia de que el cliente
+   * no pudo/quiso firmar. */
+  async function confirmReturn(params: {
+    status: ReturnStatus;
+    note: string;
+    damages: DamageEntry[];
+    name: string;
+    method: ConfirmationMethod;
+    lat: number | null;
+    lng: number | null;
+  }) {
+    if (!bookingId) return;
+    const { error } = await supabase
+      .from("vehicle_inspections")
+      .update({
+        return_status: params.status,
+        return_note: params.note || null,
+        return_damages: params.damages,
+        return_confirmation_name: params.name,
+        return_confirmed_at: new Date().toISOString(),
+        return_confirmation_method: params.method,
+        return_lat: params.lat,
+        return_lng: params.lng,
+      })
+      .eq("booking_id", bookingId);
+    if (error) throw error;
+    await reload();
+  }
+
+  return {
+    inspection,
+    loading,
+    submitDriverInspection,
+    confirmStart,
+    requestReturnConfirmation,
+    confirmReturn,
+  };
 }

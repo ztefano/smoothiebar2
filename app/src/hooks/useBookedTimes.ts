@@ -1,12 +1,16 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { useRefreshBus } from "@/hooks/useRefreshBus";
 
 /** Horarios (de cualquier cliente, más los bloqueos manuales del admin) ya
  * ocupados para el mismo día que `date`. */
 export function useBookedTimes(date: Date): { times: Date[]; loading: boolean } {
   const [times, setTimes] = useState<Date[]>([]);
   const [loading, setLoading] = useState(true);
+  const [tick, setTick] = useState(0);
   const dayKey = date.toDateString();
+
+  useRefreshBus(() => setTick((t) => t + 1));
 
   useEffect(() => {
     setLoading(true);
@@ -25,7 +29,7 @@ export function useBookedTimes(date: Date): { times: Date[]; loading: boolean } 
         setLoading(false);
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dayKey]);
+  }, [dayKey, tick]);
 
   return { times, loading };
 }

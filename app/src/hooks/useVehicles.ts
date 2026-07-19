@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { useRefreshBus } from "@/hooks/useRefreshBus";
 import type { Vehicle } from "@/types";
 
 export function useVehicles(clientId: string | null) {
@@ -16,6 +17,8 @@ export function useVehicles(clientId: string | null) {
     setVehicles((data ?? []) as Vehicle[]);
     setLoading(false);
   }, [clientId]);
+
+  useRefreshBus(reload);
 
   useEffect(() => {
     reload();

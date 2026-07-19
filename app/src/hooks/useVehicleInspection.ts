@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { useRefreshBus } from "@/hooks/useRefreshBus";
 import type {
   ConfirmationMethod,
   DamageEntry,
@@ -25,6 +26,8 @@ export function useVehicleInspection(bookingId: string | null) {
     setInspection((data as VehicleInspection) ?? null);
     setLoading(false);
   }, [bookingId]);
+
+  useRefreshBus(reload);
 
   useEffect(() => {
     if (!bookingId) return;

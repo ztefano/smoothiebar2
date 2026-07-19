@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { useRefreshBus } from "@/hooks/useRefreshBus";
 import type { BusinessHours } from "@/types";
 
 /** Horarios de la empresa por día de semana (0=domingo...6=sábado). */
@@ -16,6 +17,8 @@ export function useBusinessHours() {
     setHours((data ?? []) as BusinessHours[]);
     setLoading(false);
   }, []);
+
+  useRefreshBus(reload);
 
   useEffect(() => {
     reload();

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { useRefreshBus } from "@/hooks/useRefreshBus";
 import type { Booking, BookingStatus } from "@/types";
 
 export function useBooking(bookingId: string | null) {
@@ -16,6 +17,8 @@ export function useBooking(bookingId: string | null) {
     if (!error) setBooking(data as Booking);
     setLoading(false);
   }, [bookingId]);
+
+  useRefreshBus(reload);
 
   useEffect(() => {
     if (!bookingId) return;
@@ -67,6 +70,8 @@ export function usePendingBookings() {
     if (!error) setBookings((data ?? []) as Booking[]);
     setLoading(false);
   }, []);
+
+  useRefreshBus(reload);
 
   useEffect(() => {
     reload();

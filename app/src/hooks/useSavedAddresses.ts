@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { useRefreshBus } from "@/hooks/useRefreshBus";
 import type { Coordinates, SavedAddress } from "@/types";
 
 export function useSavedAddresses(clientId: string | null) {
@@ -16,6 +17,8 @@ export function useSavedAddresses(clientId: string | null) {
     setAddresses((data ?? []) as SavedAddress[]);
     setLoading(false);
   }, [clientId]);
+
+  useRefreshBus(reload);
 
   useEffect(() => {
     reload();

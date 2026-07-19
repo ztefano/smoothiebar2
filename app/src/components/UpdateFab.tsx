@@ -1,26 +1,27 @@
 import { useState } from "react";
 import { ActivityIndicator, Alert, Pressable, StyleSheet, Text } from "react-native";
 import * as Updates from "expo-updates";
+import { triggerGlobalRefresh } from "@/lib/refreshBus";
 
-/** Botón flotante para forzar la descarga y aplicación de una actualización
- * OTA sin tener que cerrar y volver a abrir la app. Solo visible para admin. */
+/** Botón flotante para forzar tanto la descarga de una actualización OTA
+ * como el refresco de los datos en pantalla (viajes, agendamientos, etc.),
+ * sin tener que cerrar y volver a abrir la app. */
 export function UpdateFab() {
   const [checking, setChecking] = useState(false);
 
   async function handlePress() {
-    if (!Updates.isEnabled) {
-      Alert.alert("No disponible", "Las actualizaciones OTA no están activas en este build (modo desarrollo).");
-      return;
-    }
     setChecking(true);
     try {
-      const result = await Updates.checkForUpdateAsync();
-      if (!result.isAvailable) {
-        Alert.alert("Ya estás al día", "No hay ninguna actualización pendiente.");
-        return;
+      if (Updates.isEnabled) {
+        const result = await Updates.checkForUpdateAsync();
+        if (result.isAvailable) {
+          await Updates.fetchUpdateAsync();
+          await Updates.reloadAsync();
+          return;
+        }
       }
-      await Updates.fetchUpdateAsync();
-      await Updates.reloadAsync();
+      triggerGlobalRefresh();
+      Alert.alert("Actualizado", "Se refrescaron los datos de la app (viajes, agendamientos, etc).");
     } catch (err) {
       Alert.alert("Error al actualizar", (err as Error).message);
     } finally {

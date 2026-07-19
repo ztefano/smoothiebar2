@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { useRefreshBus } from "@/hooks/useRefreshBus";
 import type { AdminBlockedSlot } from "@/types";
 
 /** Bloqueos manuales de horario (admin), próximos desde ahora. */
@@ -17,6 +18,8 @@ export function useAdminBlockedSlots() {
     setSlots((data ?? []) as AdminBlockedSlot[]);
     setLoading(false);
   }, []);
+
+  useRefreshBus(reload);
 
   useEffect(() => {
     reload();

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { useRefreshBus } from "@/hooks/useRefreshBus";
 import type { Payment } from "@/types";
 
 /** Pago (si existe) asociado a una reserva, con actualización en tiempo real. */
@@ -19,6 +20,8 @@ export function usePayment(bookingId: string | null) {
     setPayment((data as Payment) ?? null);
     setLoading(false);
   }, [bookingId]);
+
+  useRefreshBus(reload);
 
   useEffect(() => {
     if (!bookingId) return;

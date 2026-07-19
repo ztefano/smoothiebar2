@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { useRefreshBus } from "@/hooks/useRefreshBus";
 import type { PricingConfig } from "@/types";
 
 /** Configuración de tarifas (fila única). */
@@ -13,6 +14,8 @@ export function usePricingConfig() {
     setConfig((data as PricingConfig) ?? null);
     setLoading(false);
   }, []);
+
+  useRefreshBus(reload);
 
   useEffect(() => {
     reload();

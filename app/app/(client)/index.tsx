@@ -24,6 +24,7 @@ import { useActiveDriverCount } from "@/hooks/useActiveDriverCount";
 import { usePricingConfig } from "@/hooks/usePricingConfig";
 import { requestCashPayment } from "@/lib/payments";
 import { sendPushToUsers } from "@/lib/pushSend";
+import { MIN_SERVICE_MS } from "@/lib/scheduling";
 import type { Coordinates } from "@/types";
 
 const MIN_LEAD_TIME_MS = 2 * 60 * 60 * 1000; // los choferes se piden con 2h de anticipación mínima
@@ -48,7 +49,7 @@ export default function RequestChoferScreen() {
   const cashPrice =
     priceEstimate !== null && pricingConfig ? applyCashDiscount(priceEstimate, pricingConfig) : null;
   const vehicleInfo = formatVehicleParts(vehicle.brand, vehicle.model, vehicle.plate);
-  const bookedTimes = useBookedTimes(scheduledAt);
+  const { times: bookedTimes, loading: bookedTimesLoading } = useBookedTimes(scheduledAt);
   const { hours: businessHours } = useBusinessHours();
   const activeDriverCount = useActiveDriverCount();
 
@@ -59,6 +60,10 @@ export default function RequestChoferScreen() {
         "No se pudo calcular la tarifa",
         "Probá de nuevo en unos segundos. Si el problema sigue, avisale al administrador."
       );
+      return false;
+    }
+    if (bookedTimesLoading) {
+      Alert.alert("Un momento", "Todavía estamos cargando la disponibilidad de ese día. Probá de nuevo.");
       return false;
     }
     if (!address.trim() || !dropoffAddress.trim() || !dropoff || !vehicleInfo) {
@@ -78,7 +83,8 @@ export default function RequestChoferScreen() {
       return false;
     }
     const bookedAtSlot = bookedTimes.filter(
-      (t) => Math.abs(t.getTime() - scheduledAt.getTime()) < 30 * 60 * 1000
+      (t) =>
+        scheduledAt.getTime() >= t.getTime() && scheduledAt.getTime() < t.getTime() + MIN_SERVICE_MS
     ).length;
     if (activeDriverCount <= 0 || bookedAtSlot >= activeDriverCount) {
       Alert.alert("Horario completo", "Ese horario ya no tiene choferes disponibles. Elegí otro horario.");
@@ -273,6 +279,7 @@ export default function RequestChoferScreen() {
         value={scheduledAt}
         minimumDate={minimumDate}
         bookedTimes={bookedTimes}
+        bookedTimesLoading={bookedTimesLoading}
         activeDriverCount={activeDriverCount}
         businessHours={businessHours}
         onChange={setScheduledAt}

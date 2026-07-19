@@ -1,5 +1,6 @@
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { hoursForDate, timeStringToDate } from "@/hooks/useBusinessHours";
+import { MIN_SERVICE_MS } from "@/lib/scheduling";
 import type { BusinessHours } from "@/types";
 
 interface TimeSlotGridProps {
@@ -7,6 +8,7 @@ interface TimeSlotGridProps {
   date: Date;
   minimumDateTime: Date;
   bookedTimes: Date[];
+  bookedTimesLoading: boolean;
   activeDriverCount: number;
   businessHours: BusinessHours[];
   selected: Date;
@@ -33,6 +35,7 @@ export function TimeSlotGrid({
   date,
   minimumDateTime,
   bookedTimes,
+  bookedTimesLoading,
   activeDriverCount,
   businessHours,
   selected,
@@ -53,6 +56,8 @@ export function TimeSlotGrid({
             <Text style={styles.closedText}>
               Ese día no trabajamos. Elegí otra fecha desde el botón de arriba.
             </Text>
+          ) : bookedTimesLoading ? (
+            <Text style={styles.closedText}>Cargando disponibilidad…</Text>
           ) : (
             <>
               <View style={styles.legendRow}>
@@ -68,8 +73,11 @@ export function TimeSlotGrid({
               <ScrollView contentContainerStyle={styles.grid}>
                 {slots.map((slot) => {
                   const isPast = slot.getTime() < minimumDateTime.getTime();
+                  // Una reserva a las t ocupa al chofer desde t hasta t + 1h,
+                  // así que también cuenta contra la franja siguiente (t + 30min).
                   const bookedCount = bookedTimes.filter(
-                    (t) => Math.abs(t.getTime() - slot.getTime()) < SLOT_MINUTES * 60 * 1000
+                    (t) =>
+                      slot.getTime() >= t.getTime() && slot.getTime() < t.getTime() + MIN_SERVICE_MS
                   ).length;
                   const isFull = activeDriverCount <= 0 || bookedCount >= activeDriverCount;
                   const isSelected =

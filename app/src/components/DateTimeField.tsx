@@ -9,6 +9,7 @@ interface DateTimeFieldProps {
   value: Date;
   minimumDate: Date;
   bookedTimes: Date[];
+  bookedTimesLoading: boolean;
   activeDriverCount: number;
   businessHours: BusinessHours[];
   onChange: (date: Date) => void;
@@ -24,6 +25,7 @@ export function DateTimeField({
   value,
   minimumDate,
   bookedTimes,
+  bookedTimesLoading,
   activeDriverCount,
   businessHours,
   onChange,
@@ -68,6 +70,7 @@ export function DateTimeField({
         date={pendingDateRef.current ?? value}
         minimumDateTime={minimumDate}
         bookedTimes={bookedTimes}
+        bookedTimesLoading={bookedTimesLoading}
         activeDriverCount={activeDriverCount}
         businessHours={businessHours}
         selected={value}

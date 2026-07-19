@@ -1,12 +1,15 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 
-/** Horarios (de cualquier cliente) ya reservados para el mismo día que `date`. Solo informativo. */
-export function useBookedTimes(date: Date): Date[] {
+/** Horarios (de cualquier cliente, más los bloqueos manuales del admin) ya
+ * ocupados para el mismo día que `date`. */
+export function useBookedTimes(date: Date): { times: Date[]; loading: boolean } {
   const [times, setTimes] = useState<Date[]>([]);
+  const [loading, setLoading] = useState(true);
   const dayKey = date.toDateString();
 
   useEffect(() => {
+    setLoading(true);
     const start = new Date(date);
     start.setHours(0, 0, 0, 0);
     const end = new Date(start);
@@ -19,9 +22,10 @@ export function useBookedTimes(date: Date): Date[] {
       .lt("scheduled_at", end.toISOString())
       .then(({ data }) => {
         setTimes((data ?? []).map((row) => new Date(row.scheduled_at as string)));
+        setLoading(false);
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dayKey]);
 
-  return times;
+  return { times, loading };
 }

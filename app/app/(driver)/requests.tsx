@@ -15,7 +15,7 @@ import { sendPushToUsers } from "@/lib/pushSend";
 function AdminBlockPanel() {
   const [blockAt, setBlockAt] = useState(() => new Date(Date.now() + 15 * 60 * 1000));
   const [blocking, setBlocking] = useState(false);
-  const bookedTimes = useBookedTimes(blockAt);
+  const { times: bookedTimes, loading: bookedTimesLoading } = useBookedTimes(blockAt);
   const { hours: businessHours } = useBusinessHours();
   const activeDriverCount = useActiveDriverCount();
   const { slots: blockedSlots, addBlock, removeBlock } = useAdminBlockedSlots();
@@ -53,6 +53,7 @@ function AdminBlockPanel() {
         value={blockAt}
         minimumDate={new Date()}
         bookedTimes={bookedTimes}
+        bookedTimesLoading={bookedTimesLoading}
         activeDriverCount={activeDriverCount}
         businessHours={businessHours}
         onChange={setBlockAt}

@@ -18,9 +18,7 @@ const STATUS_COPY: Record<string, string> = {
 export default function ClientTripScreen() {
   const { bookingId } = useLocalSearchParams<{ bookingId: string }>();
   const { booking, loading } = useBooking(bookingId ?? null);
-  const { payment, loading: paymentLoading } = usePayment(
-    booking?.status === "completed" ? booking.id : null
-  );
+  const { payment, loading: paymentLoading } = usePayment(booking ? booking.id : null);
   const driverLocation = useDriverLocation(
     booking && booking.status !== "pending" ? booking.id : null
   );
@@ -34,6 +32,16 @@ export default function ClientTripScreen() {
   }
 
   const showMap = booking.status === "accepted" || booking.status === "in_progress";
+  const isPaid = payment?.status === "approved";
+
+  function statusText() {
+    if (booking!.status === "pending" && !paymentLoading) {
+      return isPaid
+        ? "Pago recibido. Estamos por confirmar tu chofer."
+        : "Confirmá el pago para asegurar tu reserva.";
+    }
+    return STATUS_COPY[booking!.status];
+  }
 
   async function handleCashPayment() {
     if (!booking) return;
@@ -46,7 +54,7 @@ export default function ClientTripScreen() {
   }
 
   function renderPaymentSection() {
-    if (booking!.status !== "completed") return null;
+    if (booking!.status === "cancelled") return null;
     if (paymentLoading) return <ActivityIndicator style={{ marginTop: 8 }} />;
 
     if (!payment) {
@@ -90,7 +98,7 @@ export default function ClientTripScreen() {
       )}
 
       <View style={styles.footer}>
-        <Text style={styles.statusText}>{STATUS_COPY[booking.status]}</Text>
+        <Text style={styles.statusText}>{statusText()}</Text>
         <Text style={styles.meta}>{booking.pickup_address}</Text>
         <Text style={styles.meta}>Vehículo: {booking.vehicle_info}</Text>
         <Text style={styles.price}>{formatEuros(booking.price_estimate)}</Text>

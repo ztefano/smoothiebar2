@@ -1,9 +1,84 @@
-import { Alert, FlatList, StyleSheet, Switch, Text, View } from "react-native";
+import { useState } from "react";
+import { Alert, FlatList, Pressable, StyleSheet, Switch, Text, View } from "react-native";
 import { router } from "expo-router";
 import { useAuth } from "@/state/AuthContext";
 import { usePendingBookings } from "@/hooks/useBooking";
 import { BookingCard } from "@/components/BookingCard";
 import { supabase } from "@/lib/supabase";
+import { DateTimeField } from "@/components/DateTimeField";
+import { useBookedTimes } from "@/hooks/useBookedTimes";
+import { useBusinessHours } from "@/hooks/useBusinessHours";
+import { useActiveDriverCount } from "@/hooks/useActiveDriverCount";
+import { useAdminBlockedSlots } from "@/hooks/useAdminBlockedSlots";
+
+function AdminBlockPanel() {
+  const [blockAt, setBlockAt] = useState(() => new Date(Date.now() + 15 * 60 * 1000));
+  const [blocking, setBlocking] = useState(false);
+  const bookedTimes = useBookedTimes(blockAt);
+  const { hours: businessHours } = useBusinessHours();
+  const activeDriverCount = useActiveDriverCount();
+  const { slots: blockedSlots, addBlock, removeBlock } = useAdminBlockedSlots();
+
+  async function handleBlock() {
+    setBlocking(true);
+    try {
+      await addBlock(blockAt, "");
+      Alert.alert("Listo", "Se bloqueó ese horario.");
+    } catch (err) {
+      Alert.alert("No se pudo bloquear", (err as Error).message);
+    } finally {
+      setBlocking(false);
+    }
+  }
+
+  async function handleRemove(id: string) {
+    try {
+      await removeBlock(id);
+    } catch (err) {
+      Alert.alert("No se pudo quitar el bloqueo", (err as Error).message);
+    }
+  }
+
+  return (
+    <View style={styles.blockPanel}>
+      <Text style={styles.blockTitle}>Bloquear horario por imprevistos</Text>
+      <Text style={styles.blockSubtitle}>
+        Si tenés poco personal, bloqueá un horario para que no se siga agendando ahí (cuenta como si
+        fuera una reserva más para el cálculo de disponibilidad).
+      </Text>
+
+      <DateTimeField
+        label="Horario a bloquear"
+        value={blockAt}
+        minimumDate={new Date()}
+        bookedTimes={bookedTimes}
+        activeDriverCount={activeDriverCount}
+        businessHours={businessHours}
+        onChange={setBlockAt}
+      />
+
+      <Pressable style={styles.blockButton} onPress={handleBlock} disabled={blocking}>
+        <Text style={styles.blockButtonText}>Bloquear este horario</Text>
+      </Pressable>
+
+      {blockedSlots.length > 0 ? (
+        <View style={styles.blockList}>
+          <Text style={styles.blockListTitle}>Bloqueados próximos</Text>
+          {blockedSlots.map((slot) => (
+            <View key={slot.id} style={styles.blockRow}>
+              <Text style={styles.blockRowText}>
+                {new Date(slot.blocked_at).toLocaleString("es-ES")}
+              </Text>
+              <Pressable onPress={() => handleRemove(slot.id)}>
+                <Text style={styles.blockRemove}>Quitar</Text>
+              </Pressable>
+            </View>
+          ))}
+        </View>
+      ) : null}
+    </View>
+  );
+}
 
 export default function DriverRequestsScreen() {
   const { profile, refreshProfile } = useAuth();
@@ -51,6 +126,7 @@ export default function DriverRequestsScreen() {
         data={bookings}
         keyExtractor={(item) => item.id}
         refreshing={loading}
+        ListHeaderComponent={profile?.is_admin ? <AdminBlockPanel /> : null}
         ListEmptyComponent={
           <View style={styles.empty}>
             <Text>No hay solicitudes pendientes por ahora.</Text>
@@ -79,4 +155,29 @@ const styles = StyleSheet.create({
   onlineLabel: { fontSize: 15, fontWeight: "600", color: "#111827" },
   list: { padding: 16, flexGrow: 1 },
   empty: { flex: 1, alignItems: "center", justifyContent: "center", paddingTop: 60 },
+  blockPanel: {
+    backgroundColor: "white",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    padding: 14,
+    gap: 10,
+    marginBottom: 16,
+  },
+  blockTitle: { fontSize: 15, fontWeight: "700", color: "#111827" },
+  blockSubtitle: { fontSize: 12, color: "#6B7280" },
+  blockButton: { backgroundColor: "#DC2626", borderRadius: 8, paddingVertical: 12, alignItems: "center" },
+  blockButtonText: { color: "white", fontWeight: "700", fontSize: 14 },
+  blockList: { marginTop: 6, gap: 6 },
+  blockListTitle: { fontSize: 13, fontWeight: "700", color: "#111827" },
+  blockRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 6,
+    borderBottomWidth: 1,
+    borderColor: "#F3F4F6",
+  },
+  blockRowText: { fontSize: 13, color: "#374151" },
+  blockRemove: { fontSize: 13, color: "#DC2626", fontWeight: "600" },
 });

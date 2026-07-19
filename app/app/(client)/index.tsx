@@ -22,6 +22,7 @@ import { useBookedTimes } from "@/hooks/useBookedTimes";
 import { useBusinessHours, hoursForDate } from "@/hooks/useBusinessHours";
 import { useActiveDriverCount } from "@/hooks/useActiveDriverCount";
 import { usePricingConfig } from "@/hooks/usePricingConfig";
+import { requestCashPayment } from "@/lib/payments";
 import type { Coordinates } from "@/types";
 
 const MIN_LEAD_TIME_MS = 2 * 60 * 60 * 1000; // los choferes se piden con 2h de anticipación mínima
@@ -29,6 +30,7 @@ const MIN_LEAD_TIME_MS = 2 * 60 * 60 * 1000; // los choferes se piden con 2h de 
 export default function RequestChoferScreen() {
   const { profile } = useAuth();
   const { location, errorMsg } = useCurrentLocation();
+  const [step, setStep] = useState<"form" | "confirm">("form");
   const [pickup, setPickup] = useState<Coordinates | null>(null);
   const [address, setAddress] = useState("");
   const [dropoffAddress, setDropoffAddress] = useState("");
@@ -47,60 +49,87 @@ export default function RequestChoferScreen() {
   const { hours: businessHours } = useBusinessHours();
   const activeDriverCount = useActiveDriverCount();
 
-  async function handleRequest() {
-    if (!profile || !effectivePickup || priceEstimate === null) return;
+  function validate(): boolean {
+    if (!effectivePickup || priceEstimate === null) return false;
     if (!address.trim() || !dropoffAddress.trim() || !dropoff || !vehicleInfo) {
       Alert.alert("Faltan datos", "Ingresá el punto de encuentro, el destino y los datos del vehículo.");
-      return;
+      return false;
     }
     if (scheduledAt.getTime() < minimumDate.getTime()) {
       Alert.alert(
         "Fecha inválida",
         "Los choferes se piden con al menos 2 horas de anticipación. Elegí un horario más adelante."
       );
-      return;
+      return false;
     }
     const dayHours = hoursForDate(businessHours, scheduledAt);
     if (!dayHours?.is_open) {
       Alert.alert("Horario no disponible", "Ese día no trabajamos. Elegí otra fecha.");
-      return;
+      return false;
     }
     const bookedAtSlot = bookedTimes.filter(
       (t) => Math.abs(t.getTime() - scheduledAt.getTime()) < 30 * 60 * 1000
     ).length;
     if (activeDriverCount <= 0 || bookedAtSlot >= activeDriverCount) {
-      Alert.alert(
-        "Horario completo",
-        "Ese horario ya no tiene choferes disponibles. Elegí otro horario."
-      );
-      return;
+      Alert.alert("Horario completo", "Ese horario ya no tiene choferes disponibles. Elegí otro horario.");
+      return false;
     }
+    return true;
+  }
 
+  function handleReview() {
+    if (validate()) setStep("confirm");
+  }
+
+  async function createBooking(): Promise<string> {
+    const { data, error } = await supabase
+      .from("bookings")
+      .insert({
+        client_id: profile!.id,
+        status: "pending",
+        pickup_address: address.trim(),
+        pickup_lat: effectivePickup!.lat,
+        pickup_lng: effectivePickup!.lng,
+        dropoff_address: dropoffAddress.trim() || null,
+        dropoff_lat: dropoff?.lat ?? null,
+        dropoff_lng: dropoff?.lng ?? null,
+        vehicle_info: vehicleInfo,
+        price_estimate: priceEstimate,
+        scheduled_at: scheduledAt.toISOString(),
+      })
+      .select("id")
+      .single();
+
+    if (error) throw error;
+    return data.id as string;
+  }
+
+  async function handleConfirmCard() {
+    if (!profile || priceEstimate === null) return;
     setSubmitting(true);
     try {
-      const { data, error } = await supabase
-        .from("bookings")
-        .insert({
-          client_id: profile.id,
-          status: "pending",
-          pickup_address: address.trim(),
-          pickup_lat: effectivePickup.lat,
-          pickup_lng: effectivePickup.lng,
-          dropoff_address: dropoffAddress.trim() || null,
-          dropoff_lat: dropoff?.lat ?? null,
-          dropoff_lng: dropoff?.lng ?? null,
-          vehicle_info: vehicleInfo,
-          price_estimate: priceEstimate,
-          scheduled_at: scheduledAt.toISOString(),
-        })
-        .select("id")
-        .single();
-
-      if (error) throw error;
-      Alert.alert("Listo", "Tu pedido quedó registrado. Te avisaremos cuando un chofer lo acepte.");
-      router.push(`/(client)/trip/${data.id}`);
+      const bookingId = await createBooking();
+      router.replace(`/payment/checkout?bookingId=${bookingId}`);
     } catch (err) {
-      Alert.alert("No se pudo crear el pedido", (err as Error).message);
+      Alert.alert("No se pudo crear la reserva", (err as Error).message);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleConfirmCash() {
+    if (!profile || priceEstimate === null) return;
+    setSubmitting(true);
+    try {
+      const bookingId = await createBooking();
+      await requestCashPayment(bookingId, priceEstimate);
+      Alert.alert(
+        "Reserva confirmada",
+        "Vas a pagar en efectivo al chofer. Te avisaremos apenas quede confirmado."
+      );
+      router.replace(`/(client)/trip/${bookingId}`);
+    } catch (err) {
+      Alert.alert("No se pudo crear la reserva", (err as Error).message);
     } finally {
       setSubmitting(false);
     }
@@ -120,6 +149,52 @@ export default function RequestChoferScreen() {
         <ActivityIndicator />
         <Text style={{ marginTop: 8 }}>Obteniendo tu ubicación…</Text>
       </View>
+    );
+  }
+
+  if (step === "confirm") {
+    return (
+      <ScrollView contentContainerStyle={styles.container}>
+        <Text style={styles.title}>Confirmá tu pedido</Text>
+        <Text style={styles.subtitle}>Revisá los datos antes de pagar. Una vez que reservás, el horario queda bloqueado para vos.</Text>
+
+        <View style={styles.summaryCard}>
+          <Text style={styles.summaryLabel}>Punto de encuentro</Text>
+          <Text style={styles.summaryValue}>{address}</Text>
+
+          <Text style={styles.summaryLabel}>Destino</Text>
+          <Text style={styles.summaryValue}>{dropoffAddress}</Text>
+
+          <Text style={styles.summaryLabel}>Fecha y hora</Text>
+          <Text style={styles.summaryValue}>{scheduledAt.toLocaleString("es-ES")}</Text>
+
+          <Text style={styles.summaryLabel}>Vehículo</Text>
+          <Text style={styles.summaryValue}>{vehicleInfo}</Text>
+
+          <Text style={styles.summaryLabel}>Total a pagar</Text>
+          <Text style={styles.price}>{priceEstimate !== null ? formatEuros(priceEstimate) : "—"}</Text>
+        </View>
+
+        <Pressable style={styles.button} onPress={handleConfirmCard} disabled={submitting}>
+          {submitting ? (
+            <ActivityIndicator color="white" />
+          ) : (
+            <Text style={styles.buttonText}>Confirmar y pagar con tarjeta/Bizum</Text>
+          )}
+        </Pressable>
+
+        <Pressable style={[styles.button, styles.cashButton]} onPress={handleConfirmCash} disabled={submitting}>
+          {submitting ? (
+            <ActivityIndicator color="white" />
+          ) : (
+            <Text style={styles.buttonText}>Confirmar y pagar en efectivo</Text>
+          )}
+        </Pressable>
+
+        <Pressable style={styles.backButton} onPress={() => setStep("form")} disabled={submitting}>
+          <Text style={styles.backButtonText}>Volver a editar</Text>
+        </Pressable>
+      </ScrollView>
     );
   }
 
@@ -172,12 +247,8 @@ export default function RequestChoferScreen() {
         <Text style={styles.price}>Tarifa estimada: {formatEuros(priceEstimate)}</Text>
       ) : null}
 
-      <Pressable style={styles.button} onPress={handleRequest} disabled={submitting}>
-        {submitting ? (
-          <ActivityIndicator color="white" />
-        ) : (
-          <Text style={styles.buttonText}>Pedir chofer</Text>
-        )}
+      <Pressable style={styles.button} onPress={handleReview}>
+        <Text style={styles.buttonText}>Revisar y confirmar</Text>
       </Pressable>
     </ScrollView>
   );
@@ -190,5 +261,18 @@ const styles = StyleSheet.create({
   subtitle: { fontSize: 13, color: "#6B7280", marginBottom: 4 },
   price: { fontSize: 16, fontWeight: "700", color: "#111827" },
   button: { backgroundColor: "#111827", borderRadius: 10, paddingVertical: 14, alignItems: "center" },
+  cashButton: { backgroundColor: "#D97706" },
   buttonText: { color: "white", fontWeight: "700", fontSize: 15 },
+  backButton: { alignItems: "center", paddingVertical: 10 },
+  backButtonText: { color: "#6B7280", fontWeight: "600", fontSize: 14 },
+  summaryCard: {
+    backgroundColor: "white",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    padding: 16,
+    gap: 4,
+  },
+  summaryLabel: { fontSize: 12, color: "#6B7280", marginTop: 8 },
+  summaryValue: { fontSize: 15, fontWeight: "600", color: "#111827" },
 });

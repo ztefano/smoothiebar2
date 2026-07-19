@@ -105,3 +105,11 @@ export interface Coordinates {
   lat: number;
   lng: number;
 }
+
+export interface AdminBlockedSlot {
+  id: string;
+  blocked_at: string;
+  note: string | null;
+  created_by: string | null;
+  created_at: string;
+}

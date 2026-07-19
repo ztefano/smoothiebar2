@@ -1,31 +1,28 @@
 import { haversineDistanceKm } from "@/lib/distance";
-import type { Coordinates } from "@/types";
+import type { Coordinates, PricingConfig } from "@/types";
 
 /**
- * Tarifa simple para el MVP: tarifa base + costo por km en línea recta.
- * Ajustar estos valores (o reemplazar por una tabla en la base de datos)
- * cuando se defina la tarifa real del negocio.
+ * Tarifa plana hasta `flat_km`, más extra por km si el trayecto es más
+ * largo, más un recargo si el punto de recogida está fuera de la zona de
+ * servicio (más allá de `zone_radius_km` desde el centro configurado).
+ * Estos valores se configuran desde el panel de admin (pantalla Empresa).
  */
-const BASE_FARE_EUR = 25;
-const PRICE_PER_KM_EUR = 1.1;
-const NIGHT_SURCHARGE_MULTIPLIER = 1.2;
-
-export function isNightTime(date: Date = new Date()): boolean {
-  const hour = date.getHours();
-  return hour >= 23 || hour < 6;
-}
-
 export function estimatePrice(
   pickup: Coordinates,
   dropoff: Coordinates | null,
-  when: Date = new Date()
+  config: PricingConfig
 ): number {
-  const distanceKm = dropoff ? haversineDistanceKm(pickup, dropoff) : 5; // estimación default sin destino
-  let price = BASE_FARE_EUR + distanceKm * PRICE_PER_KM_EUR;
+  const tripKm = dropoff ? haversineDistanceKm(pickup, dropoff) : config.flat_km;
+  const extraTripKm = Math.max(0, tripKm - config.flat_km);
 
-  if (isNightTime(when)) {
-    price *= NIGHT_SURCHARGE_MULTIPLIER;
-  }
+  const zoneCenter: Coordinates = { lat: config.zone_center_lat, lng: config.zone_center_lng };
+  const pickupDistanceFromCenterKm = haversineDistanceKm(pickup, zoneCenter);
+  const outOfZoneKm = Math.max(0, pickupDistanceFromCenterKm - config.zone_radius_km);
+
+  const price =
+    config.flat_fare +
+    extraTripKm * config.extra_km_price +
+    outOfZoneKm * config.out_of_zone_km_price;
 
   return Math.round(price * 2) / 2; // redondeo a 0,50 €
 }

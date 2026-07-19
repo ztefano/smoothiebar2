@@ -21,6 +21,7 @@ import { formatVehicleParts } from "@/hooks/useVehicles";
 import { useBookedTimes } from "@/hooks/useBookedTimes";
 import { useBusinessHours, hoursForDate } from "@/hooks/useBusinessHours";
 import { useActiveDriverCount } from "@/hooks/useActiveDriverCount";
+import { usePricingConfig } from "@/hooks/usePricingConfig";
 import type { Coordinates } from "@/types";
 
 const MIN_LEAD_TIME_MS = 2 * 60 * 60 * 1000; // los choferes se piden con 2h de anticipación mínima
@@ -38,16 +39,16 @@ export default function RequestChoferScreen() {
 
   const effectivePickup = pickup ?? location;
   const minimumDate = new Date(Date.now() + MIN_LEAD_TIME_MS);
-  const priceEstimate = effectivePickup
-    ? estimatePrice(effectivePickup, dropoff, scheduledAt)
-    : null;
+  const { config: pricingConfig } = usePricingConfig();
+  const priceEstimate =
+    effectivePickup && pricingConfig ? estimatePrice(effectivePickup, dropoff, pricingConfig) : null;
   const vehicleInfo = formatVehicleParts(vehicle.brand, vehicle.model, vehicle.plate);
   const bookedTimes = useBookedTimes(scheduledAt);
   const { hours: businessHours } = useBusinessHours();
   const activeDriverCount = useActiveDriverCount();
 
   async function handleRequest() {
-    if (!profile || !effectivePickup) return;
+    if (!profile || !effectivePickup || priceEstimate === null) return;
     if (!address.trim() || !dropoffAddress.trim() || !dropoff || !vehicleInfo) {
       Alert.alert("Faltan datos", "Ingresá el punto de encuentro, el destino y los datos del vehículo.");
       return;

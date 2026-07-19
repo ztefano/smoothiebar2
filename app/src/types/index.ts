@@ -33,6 +33,17 @@ export interface BusinessHours {
   close_time: string; // "HH:MM:SS"
 }
 
+export interface PricingConfig {
+  id: number;
+  flat_fare: number;
+  flat_km: number;
+  extra_km_price: number;
+  zone_center_lat: number;
+  zone_center_lng: number;
+  zone_radius_km: number;
+  out_of_zone_km_price: number;
+}
+
 export interface Vehicle {
   id: string;
   client_id: string;

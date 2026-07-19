@@ -16,7 +16,7 @@ import { AddressField } from "@/components/AddressField";
 import { VehicleQuickSelect, type VehicleParts } from "@/components/VehicleQuickSelect";
 import { DateTimeField } from "@/components/DateTimeField";
 import { supabase } from "@/lib/supabase";
-import { estimatePrice, formatEuros } from "@/lib/pricing";
+import { estimatePrice, applyCashDiscount, formatEuros } from "@/lib/pricing";
 import { formatVehicleParts } from "@/hooks/useVehicles";
 import { useBookedTimes } from "@/hooks/useBookedTimes";
 import { useBusinessHours, hoursForDate } from "@/hooks/useBusinessHours";
@@ -45,13 +45,22 @@ export default function RequestChoferScreen() {
   const { config: pricingConfig } = usePricingConfig();
   const priceEstimate =
     effectivePickup && pricingConfig ? estimatePrice(effectivePickup, dropoff, pricingConfig) : null;
+  const cashPrice =
+    priceEstimate !== null && pricingConfig ? applyCashDiscount(priceEstimate, pricingConfig) : null;
   const vehicleInfo = formatVehicleParts(vehicle.brand, vehicle.model, vehicle.plate);
   const bookedTimes = useBookedTimes(scheduledAt);
   const { hours: businessHours } = useBusinessHours();
   const activeDriverCount = useActiveDriverCount();
 
   function validate(): boolean {
-    if (!effectivePickup || priceEstimate === null) return false;
+    if (!effectivePickup) return false;
+    if (priceEstimate === null) {
+      Alert.alert(
+        "No se pudo calcular la tarifa",
+        "Probá de nuevo en unos segundos. Si el problema sigue, avisale al administrador."
+      );
+      return false;
+    }
     if (!address.trim() || !dropoffAddress.trim() || !dropoff || !vehicleInfo) {
       Alert.alert("Faltan datos", "Ingresá el punto de encuentro, el destino y los datos del vehículo.");
       return false;
@@ -82,7 +91,7 @@ export default function RequestChoferScreen() {
     if (validate()) setStep("confirm");
   }
 
-  async function createBooking(): Promise<string> {
+  async function createBooking(finalPrice: number): Promise<string> {
     const { data, error } = await supabase
       .from("bookings")
       .insert({
@@ -95,7 +104,7 @@ export default function RequestChoferScreen() {
         dropoff_lat: dropoff?.lat ?? null,
         dropoff_lng: dropoff?.lng ?? null,
         vehicle_info: vehicleInfo,
-        price_estimate: priceEstimate,
+        price_estimate: finalPrice,
         scheduled_at: scheduledAt.toISOString(),
       })
       .select("id")
@@ -125,7 +134,7 @@ export default function RequestChoferScreen() {
     if (!profile || priceEstimate === null) return;
     setSubmitting(true);
     try {
-      const bookingId = await createBooking();
+      const bookingId = await createBooking(priceEstimate);
       notifyActiveDrivers();
       router.replace(`/payment/checkout?bookingId=${bookingId}`);
     } catch (err) {
@@ -136,12 +145,12 @@ export default function RequestChoferScreen() {
   }
 
   async function handleConfirmCash() {
-    if (!profile || priceEstimate === null) return;
+    if (!profile || cashPrice === null) return;
     setSubmitting(true);
     try {
-      const bookingId = await createBooking();
+      const bookingId = await createBooking(cashPrice);
       notifyActiveDrivers();
-      await requestCashPayment(bookingId, priceEstimate);
+      await requestCashPayment(bookingId, cashPrice);
       Alert.alert(
         "Reserva confirmada",
         "Vas a pagar en efectivo al chofer. Te avisaremos apenas quede confirmado."
@@ -189,16 +198,18 @@ export default function RequestChoferScreen() {
 
           <Text style={styles.summaryLabel}>Vehículo</Text>
           <Text style={styles.summaryValue}>{vehicleInfo}</Text>
-
-          <Text style={styles.summaryLabel}>Total a pagar</Text>
-          <Text style={styles.price}>{priceEstimate !== null ? formatEuros(priceEstimate) : "—"}</Text>
         </View>
 
         <Pressable style={styles.button} onPress={handleConfirmCard} disabled={submitting}>
           {submitting ? (
             <ActivityIndicator color="white" />
           ) : (
-            <Text style={styles.buttonText}>Confirmar y pagar con tarjeta/Bizum</Text>
+            <View style={styles.payOptionInner}>
+              <Text style={styles.buttonText}>Tarjeta o Bizum</Text>
+              <Text style={styles.buttonPrice}>
+                {priceEstimate !== null ? formatEuros(priceEstimate) : "—"}
+              </Text>
+            </View>
           )}
         </Pressable>
 
@@ -206,7 +217,12 @@ export default function RequestChoferScreen() {
           {submitting ? (
             <ActivityIndicator color="white" />
           ) : (
-            <Text style={styles.buttonText}>Confirmar y pagar en efectivo</Text>
+            <View style={styles.payOptionInner}>
+              <Text style={styles.buttonText}>
+                Efectivo ({Math.round((pricingConfig?.cash_discount_rate ?? 0) * 100)}% dto.)
+              </Text>
+              <Text style={styles.buttonPrice}>{cashPrice !== null ? formatEuros(cashPrice) : "—"}</Text>
+            </View>
           )}
         </Pressable>
 
@@ -282,6 +298,8 @@ const styles = StyleSheet.create({
   button: { backgroundColor: "#111827", borderRadius: 10, paddingVertical: 14, alignItems: "center" },
   cashButton: { backgroundColor: "#D97706" },
   buttonText: { color: "white", fontWeight: "700", fontSize: 15 },
+  payOptionInner: { flexDirection: "row", alignItems: "center", gap: 8 },
+  buttonPrice: { color: "white", fontWeight: "800", fontSize: 15 },
   backButton: { alignItems: "center", paddingVertical: 10 },
   backButtonText: { color: "#6B7280", fontWeight: "600", fontSize: 14 },
   summaryCard: {

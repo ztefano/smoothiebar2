@@ -27,6 +27,12 @@ export function estimatePrice(
   return Math.round(price * 2) / 2; // redondeo a 0,50 €
 }
 
+/** Precio final pagando en efectivo, con el descuento configurado por el admin. */
+export function applyCashDiscount(price: number, config: PricingConfig): number {
+  const discounted = price * (1 - config.cash_discount_rate);
+  return Math.round(discounted * 2) / 2; // redondeo a 0,50 €
+}
+
 export function formatEuros(amount: number): string {
   return amount.toLocaleString("es-ES", {
     style: "currency",

@@ -66,6 +66,7 @@ export default function CompanyScreen() {
         out_of_zone_km_price: String(pricing.out_of_zone_km_price),
         zone_center_lat: String(pricing.zone_center_lat),
         zone_center_lng: String(pricing.zone_center_lng),
+        cash_discount_percent: String(Math.round(pricing.cash_discount_rate * 100)),
       });
     }
   }, [pricing]);
@@ -110,6 +111,7 @@ export default function CompanyScreen() {
       out_of_zone_km_price: Number(pricingDraft.out_of_zone_km_price),
       zone_center_lat: Number(pricingDraft.zone_center_lat),
       zone_center_lng: Number(pricingDraft.zone_center_lng),
+      cash_discount_rate: Number(pricingDraft.cash_discount_percent) / 100,
     };
     if (Object.values(parsed).some((n) => Number.isNaN(n))) {
       Alert.alert("Datos inválidos", "Revisá que todos los valores de tarifa sean números.");
@@ -128,7 +130,7 @@ export default function CompanyScreen() {
     }
   }
 
-  function setPricingField(field: keyof PricingConfig, value: string) {
+  function setPricingField(field: keyof PricingConfig | "cash_discount_percent", value: string) {
     setPricingDraft((prev) => ({ ...prev, [field]: value }));
   }
 
@@ -254,6 +256,14 @@ export default function CompanyScreen() {
           keyboardType="decimal-pad"
           value={pricingDraft.out_of_zone_km_price ?? ""}
           onChangeText={(v) => setPricingField("out_of_zone_km_price", v)}
+        />
+
+        <Text style={styles.fieldLabel}>Descuento por pagar en efectivo (%)</Text>
+        <TextInput
+          style={styles.input}
+          keyboardType="decimal-pad"
+          value={pricingDraft.cash_discount_percent ?? ""}
+          onChangeText={(v) => setPricingField("cash_discount_percent", v)}
         />
       </View>
 

@@ -43,6 +43,7 @@ export interface PricingConfig {
   zone_center_lng: number;
   zone_radius_km: number;
   out_of_zone_km_price: number;
+  cash_discount_rate: number; // ej: 0.10 = 10% de descuento pagando en efectivo
 }
 
 export interface Vehicle {

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { router } from "expo-router";
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSavedAddresses } from "@/hooks/useSavedAddresses";
 import { AddressAutocomplete } from "@/components/AddressAutocomplete";
 import { reverseGeocode } from "@/lib/places";
@@ -34,9 +34,20 @@ export function AddressField({
     if (!currentLocation) return;
     setLocatingMe(true);
     try {
-      const address = (await reverseGeocode(currentLocation)) ?? "Mi ubicación actual";
-      onChangeText(address);
-      onSelectPlace({ address, coords: currentLocation });
+      const address = await reverseGeocode(currentLocation);
+      // El pin/coordenadas siempre son reales (vienen del GPS); lo que
+      // puede fallar es solo la conversión a texto legible. Nunca hay que
+      // guardar un texto inventado como si fuera la dirección real.
+      onSelectPlace({ address: address ?? "", coords: currentLocation });
+      if (address) {
+        onChangeText(address);
+      } else {
+        onChangeText("");
+        Alert.alert(
+          "No pudimos detectar la dirección",
+          "Ubicamos el pin en el mapa igual, pero escribí la dirección a mano para que quede clara."
+        );
+      }
     } finally {
       setLocatingMe(false);
     }

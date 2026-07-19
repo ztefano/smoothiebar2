@@ -8,6 +8,7 @@ export default function DriverLayout() {
   return (
     <RoleGate role="driver">
       <Tabs screenOptions={{ headerShown: true, tabBarActiveTintColor: "#111827" }}>
+        <Tabs.Screen name="index" options={{ href: null, title: "Chofer de Reemplazo" }} />
         <Tabs.Screen name="requests" options={{ title: "Solicitudes" }} />
         <Tabs.Screen name="earnings" options={{ title: "Ganancias" }} />
         <Tabs.Screen name="profile" options={{ title: "Perfil" }} />

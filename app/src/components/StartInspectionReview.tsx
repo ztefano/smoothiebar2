@@ -23,6 +23,7 @@ export function StartInspectionReview({ inspection, defaultName, onConfirm }: St
   const [agreed, setAgreed] = useState(false);
   const [name, setName] = useState(defaultName);
   const [submitting, setSubmitting] = useState(false);
+  const [showReport, setShowReport] = useState(false);
 
   async function handleConfirm() {
     setSubmitting(true);
@@ -35,18 +36,16 @@ export function StartInspectionReview({ inspection, defaultName, onConfirm }: St
 
   return (
     <View style={styles.card}>
-      <Text style={styles.title}>Revisá el estado de tu vehículo</Text>
-      <Text style={styles.statusLine}>{GENERAL_STATUS_LABEL[inspection.general_status]}</Text>
-
-      {inspection.general_status === "detail" ? <DamageSummaryList damages={inspection.damages} /> : null}
+      <Text style={styles.title}>Confirmá el inicio del viaje</Text>
+      <Text style={styles.intro}>
+        Antes de que el chofer arranque, declarás estar conforme con el informe inicial del estado del vehículo.
+      </Text>
 
       <Pressable style={styles.checkRow} onPress={() => setAgreed(!agreed)}>
         <View style={[styles.checkbox, agreed && styles.checkboxChecked]}>
           {agreed ? <Text style={styles.checkmark}>✓</Text> : null}
         </View>
-        <Text style={styles.checkText}>
-          Declaro haber revisado el vehículo y estoy de acuerdo con el estado descrito arriba.
-        </Text>
+        <Text style={styles.checkText}>Declaro estar conforme con el informe inicial del vehículo.</Text>
       </Pressable>
 
       <TextInput
@@ -55,6 +54,17 @@ export function StartInspectionReview({ inspection, defaultName, onConfirm }: St
         value={name}
         onChangeText={setName}
       />
+
+      <Pressable style={styles.reportToggle} onPress={() => setShowReport(!showReport)}>
+        <Text style={styles.reportToggleText}>{showReport ? "Ocultar el informe" : "Ver el informe"}</Text>
+      </Pressable>
+
+      {showReport ? (
+        <View style={styles.reportBox}>
+          <Text style={styles.statusLine}>{GENERAL_STATUS_LABEL[inspection.general_status]}</Text>
+          {inspection.general_status === "detail" ? <DamageSummaryList damages={inspection.damages} /> : null}
+        </View>
+      ) : null}
 
       <Pressable
         style={[styles.button, (!agreed || !name.trim()) && styles.buttonDisabled]}
@@ -78,7 +88,18 @@ const styles = StyleSheet.create({
     margin: 16,
   },
   title: { fontSize: 16, fontWeight: "800", color: "#111827" },
+  intro: { fontSize: 13, color: "#6B7280" },
   statusLine: { fontSize: 14, color: "#374151" },
+  reportToggle: { alignSelf: "flex-start" },
+  reportToggleText: { fontSize: 13, fontWeight: "700", color: "#2563EB" },
+  reportBox: {
+    backgroundColor: "#F9FAFB",
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    padding: 12,
+    gap: 10,
+  },
   checkRow: { flexDirection: "row", gap: 10, alignItems: "flex-start" },
   checkbox: {
     width: 22,

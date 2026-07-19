@@ -115,3 +115,24 @@ export interface AdminBlockedSlot {
   created_by: string | null;
   created_at: string;
 }
+
+export type DamageType = "pintura" | "chapa";
+
+export interface DamageEntry {
+  zone: string;
+  types: DamageType[];
+  photo_url: string | null;
+}
+
+export type InspectionGeneralStatus = "ok" | "bad_condition" | "detail";
+
+export interface VehicleInspection {
+  id: string;
+  booking_id: string;
+  driver_id: string;
+  general_status: InspectionGeneralStatus;
+  damages: DamageEntry[];
+  client_confirmation_name: string | null;
+  confirmed_at: string | null;
+  created_at: string;
+}

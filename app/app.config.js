@@ -31,6 +31,8 @@ module.exports = ({ config }) => ({
       "expo-image-picker",
       {
         photosPermission: "Permitir el acceso a tus fotos para elegir tu foto de perfil.",
+        cameraPermission:
+          "Permitir el acceso a la cámara para sacar fotos de desperfectos del vehículo antes del viaje.",
       },
     ],
     [

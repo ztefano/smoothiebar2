@@ -33,6 +33,12 @@ module.exports = ({ config }) => ({
         photosPermission: "Permitir el acceso a tus fotos para elegir tu foto de perfil.",
       },
     ],
+    [
+      "expo-notifications",
+      {
+        color: "#111827",
+      },
+    ],
   ],
   ios: {
     supportsTablet: false,

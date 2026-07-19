@@ -23,6 +23,7 @@ export interface Profile {
   license_type: string | null;
   address: string | null;
   nationality: string | null;
+  push_token: string | null;
   created_at: string;
 }
 

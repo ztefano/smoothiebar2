@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { supabase } from "@/lib/supabase";
+import { AvatarPicker } from "@/components/AvatarPicker";
 import type { Profile } from "@/types";
 
 interface EditableProfileHeaderProps {
@@ -49,6 +50,12 @@ export function EditableProfileHeader({ profile, email, roleLabel, onSaved }: Ed
   if (editing) {
     return (
       <View style={styles.form}>
+        <AvatarPicker
+          userId={profile.id}
+          avatarUrl={profile.avatar_url}
+          fullName={profile.full_name}
+          onUploaded={onSaved}
+        />
         <TextInput style={styles.input} placeholder="Nombre" value={fullName} onChangeText={setFullName} />
         <TextInput style={styles.input} placeholder="Apellido" value={lastName} onChangeText={setLastName} />
         <TextInput
@@ -72,6 +79,12 @@ export function EditableProfileHeader({ profile, email, roleLabel, onSaved }: Ed
 
   return (
     <View style={{ gap: 2 }}>
+      <AvatarPicker
+        userId={profile.id}
+        avatarUrl={profile.avatar_url}
+        fullName={profile.full_name}
+        onUploaded={onSaved}
+      />
       <Text style={styles.name}>
         {profile.full_name} {profile.last_name}
       </Text>

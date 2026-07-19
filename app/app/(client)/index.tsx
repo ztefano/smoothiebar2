@@ -23,6 +23,7 @@ import { useBusinessHours, hoursForDate } from "@/hooks/useBusinessHours";
 import { useActiveDriverCount } from "@/hooks/useActiveDriverCount";
 import { usePricingConfig } from "@/hooks/usePricingConfig";
 import { requestCashPayment } from "@/lib/payments";
+import { sendPushToUsers } from "@/lib/pushSend";
 import type { Coordinates } from "@/types";
 
 const MIN_LEAD_TIME_MS = 2 * 60 * 60 * 1000; // los choferes se piden con 2h de anticipación mínima
@@ -104,11 +105,28 @@ export default function RequestChoferScreen() {
     return data.id as string;
   }
 
+  function notifyActiveDrivers() {
+    supabase
+      .from("profiles")
+      .select("id")
+      .eq("role", "driver")
+      .eq("is_active", true)
+      .then(({ data: drivers }) => {
+        const ids = (drivers ?? []).map((d) => d.id as string);
+        sendPushToUsers(
+          ids,
+          "Nueva solicitud",
+          `${address.trim()} → ${dropoffAddress.trim()} · ${scheduledAt.toLocaleString("es-ES")}`
+        );
+      });
+  }
+
   async function handleConfirmCard() {
     if (!profile || priceEstimate === null) return;
     setSubmitting(true);
     try {
       const bookingId = await createBooking();
+      notifyActiveDrivers();
       router.replace(`/payment/checkout?bookingId=${bookingId}`);
     } catch (err) {
       Alert.alert("No se pudo crear la reserva", (err as Error).message);
@@ -122,6 +140,7 @@ export default function RequestChoferScreen() {
     setSubmitting(true);
     try {
       const bookingId = await createBooking();
+      notifyActiveDrivers();
       await requestCashPayment(bookingId, priceEstimate);
       Alert.alert(
         "Reserva confirmada",

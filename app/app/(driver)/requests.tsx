@@ -10,6 +10,7 @@ import { useBookedTimes } from "@/hooks/useBookedTimes";
 import { useBusinessHours } from "@/hooks/useBusinessHours";
 import { useActiveDriverCount } from "@/hooks/useActiveDriverCount";
 import { useAdminBlockedSlots } from "@/hooks/useAdminBlockedSlots";
+import { sendPushToUsers } from "@/lib/pushSend";
 
 function AdminBlockPanel() {
   const [blockAt, setBlockAt] = useState(() => new Date(Date.now() + 15 * 60 * 1000));
@@ -99,15 +100,24 @@ export default function DriverRequestsScreen() {
 
   async function acceptBooking(bookingId: string) {
     if (!profile) return;
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from("bookings")
       .update({ status: "accepted", driver_id: profile.id })
       .eq("id", bookingId)
-      .eq("status", "pending"); // evita que dos choferes tomen el mismo viaje
+      .eq("status", "pending") // evita que dos choferes tomen el mismo viaje
+      .select("client_id")
+      .single();
 
     if (error) {
       Alert.alert("No se pudo aceptar", error.message);
       return;
+    }
+    if (data?.client_id) {
+      sendPushToUsers(
+        [data.client_id as string],
+        "¡Tu chofer está en camino!",
+        `${profile.full_name} aceptó tu viaje.`
+      );
     }
     router.push(`/(driver)/trip/${bookingId}`);
   }

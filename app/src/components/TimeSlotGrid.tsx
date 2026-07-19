@@ -94,17 +94,17 @@ export function TimeSlotGrid({
                       }}
                       style={[
                         styles.slot,
+                        isPast && !isFull && styles.slotDisabled,
                         isFull && styles.slotBooked,
                         isSelected && styles.slotSelected,
-                        disabled && styles.slotDisabled,
                       ]}
                     >
                       <Text
                         style={[
                           styles.slotText,
+                          isPast && !isFull && styles.slotTextDisabled,
                           isFull && styles.slotTextBooked,
                           isSelected && styles.slotTextSelected,
-                          disabled && styles.slotTextDisabled,
                         ]}
                       >
                         {slot.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}

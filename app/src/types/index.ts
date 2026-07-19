@@ -18,7 +18,19 @@ export interface Profile {
   role: UserRole;
   is_online: boolean;
   is_admin: boolean;
+  is_active: boolean;
+  dni: string | null;
+  license_type: string | null;
+  address: string | null;
+  nationality: string | null;
   created_at: string;
+}
+
+export interface BusinessHours {
+  day_of_week: number; // 0=domingo ... 6=sábado
+  is_open: boolean;
+  open_time: string; // "HH:MM:SS"
+  close_time: string; // "HH:MM:SS"
 }
 
 export interface Vehicle {

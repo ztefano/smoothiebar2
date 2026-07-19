@@ -19,6 +19,8 @@ import { supabase } from "@/lib/supabase";
 import { estimatePrice, formatEuros } from "@/lib/pricing";
 import { formatVehicleParts } from "@/hooks/useVehicles";
 import { useBookedTimes } from "@/hooks/useBookedTimes";
+import { useBusinessHours, hoursForDate } from "@/hooks/useBusinessHours";
+import { useActiveDriverCount } from "@/hooks/useActiveDriverCount";
 import type { Coordinates } from "@/types";
 
 const MIN_LEAD_TIME_MS = 2 * 60 * 60 * 1000; // los choferes se piden con 2h de anticipación mínima
@@ -41,6 +43,8 @@ export default function RequestChoferScreen() {
     : null;
   const vehicleInfo = formatVehicleParts(vehicle.brand, vehicle.model, vehicle.plate);
   const bookedTimes = useBookedTimes(scheduledAt);
+  const { hours: businessHours } = useBusinessHours();
+  const activeDriverCount = useActiveDriverCount();
 
   async function handleRequest() {
     if (!profile || !effectivePickup) return;
@@ -52,6 +56,21 @@ export default function RequestChoferScreen() {
       Alert.alert(
         "Fecha inválida",
         "Los choferes se piden con al menos 2 horas de anticipación. Elegí un horario más adelante."
+      );
+      return;
+    }
+    const dayHours = hoursForDate(businessHours, scheduledAt);
+    if (!dayHours?.is_open) {
+      Alert.alert("Horario no disponible", "Ese día no trabajamos. Elegí otra fecha.");
+      return;
+    }
+    const bookedAtSlot = bookedTimes.filter(
+      (t) => Math.abs(t.getTime() - scheduledAt.getTime()) < 30 * 60 * 1000
+    ).length;
+    if (activeDriverCount <= 0 || bookedAtSlot >= activeDriverCount) {
+      Alert.alert(
+        "Horario completo",
+        "Ese horario ya no tiene choferes disponibles. Elegí otro horario."
       );
       return;
     }
@@ -143,6 +162,8 @@ export default function RequestChoferScreen() {
         value={scheduledAt}
         minimumDate={minimumDate}
         bookedTimes={bookedTimes}
+        activeDriverCount={activeDriverCount}
+        businessHours={businessHours}
         onChange={setScheduledAt}
       />
 

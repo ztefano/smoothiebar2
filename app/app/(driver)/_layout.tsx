@@ -17,6 +17,10 @@ export default function DriverLayout() {
           name="admin"
           options={{ href: profile?.is_admin ? undefined : null, title: "Choferes" }}
         />
+        <Tabs.Screen
+          name="company"
+          options={{ href: profile?.is_admin ? undefined : null, title: "Empresa" }}
+        />
       </Tabs>
     </RoleGate>
   );

@@ -1,10 +1,14 @@
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { hoursForDate, timeStringToDate } from "@/hooks/useBusinessHours";
+import type { BusinessHours } from "@/types";
 
 interface TimeSlotGridProps {
   visible: boolean;
   date: Date;
   minimumDateTime: Date;
   bookedTimes: Date[];
+  activeDriverCount: number;
+  businessHours: BusinessHours[];
   selected: Date;
   onSelect: (datetime: Date) => void;
   onClose: () => void;
@@ -12,84 +16,98 @@ interface TimeSlotGridProps {
 
 const SLOT_MINUTES = 30;
 
-function buildSlots(date: Date): Date[] {
+function buildSlots(date: Date, open: string, close: string): Date[] {
   const slots: Date[] = [];
-  for (let h = 0; h < 24; h++) {
-    for (const m of [0, 30]) {
-      const slot = new Date(date);
-      slot.setHours(h, m, 0, 0);
-      slots.push(slot);
-    }
+  const start = timeStringToDate(date, open);
+  const end = timeStringToDate(date, close);
+  for (let t = start.getTime(); t < end.getTime(); t += SLOT_MINUTES * 60 * 1000) {
+    slots.push(new Date(t));
   }
   return slots;
 }
 
-/** Grilla de horarios cada 30 min, marcando los ya ocupados y los que ya pasaron. */
+/** Grilla de horarios cada 30 min, dentro del horario de la empresa ese día,
+ * bloqueando los que ya alcanzaron la capacidad de choferes activos. */
 export function TimeSlotGrid({
   visible,
   date,
   minimumDateTime,
   bookedTimes,
+  activeDriverCount,
+  businessHours,
   selected,
   onSelect,
   onClose,
 }: TimeSlotGridProps) {
-  const slots = buildSlots(date);
+  const dayHours = hoursForDate(businessHours, date);
+  const isOpen = !!dayHours?.is_open;
+  const slots = isOpen ? buildSlots(date, dayHours!.open_time, dayHours!.close_time) : [];
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <View style={styles.backdrop}>
         <View style={styles.sheet}>
           <Text style={styles.title}>Elegí el horario</Text>
-          <View style={styles.legendRow}>
-            <View style={styles.legendItem}>
-              <View style={[styles.legendDot, styles.legendAvailable]} />
-              <Text style={styles.legendText}>Disponible</Text>
-            </View>
-            <View style={styles.legendItem}>
-              <View style={[styles.legendDot, styles.legendBooked]} />
-              <Text style={styles.legendText}>Ya pedido</Text>
-            </View>
-          </View>
-          <ScrollView contentContainerStyle={styles.grid}>
-            {slots.map((slot) => {
-              const isPast = slot.getTime() < minimumDateTime.getTime();
-              const isBooked = bookedTimes.some(
-                (t) => Math.abs(t.getTime() - slot.getTime()) < SLOT_MINUTES * 60 * 1000
-              );
-              const isSelected =
-                slot.getHours() === selected.getHours() && slot.getMinutes() === selected.getMinutes();
-              const disabled = isPast;
 
-              return (
-                <Pressable
-                  key={slot.toISOString()}
-                  disabled={disabled}
-                  onPress={() => {
-                    onSelect(slot);
-                    onClose();
-                  }}
-                  style={[
-                    styles.slot,
-                    isBooked && styles.slotBooked,
-                    isSelected && styles.slotSelected,
-                    disabled && styles.slotDisabled,
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.slotText,
-                      isBooked && styles.slotTextBooked,
-                      isSelected && styles.slotTextSelected,
-                      disabled && styles.slotTextDisabled,
-                    ]}
-                  >
-                    {slot.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
+          {!isOpen ? (
+            <Text style={styles.closedText}>
+              Ese día no trabajamos. Elegí otra fecha desde el botón de arriba.
+            </Text>
+          ) : (
+            <>
+              <View style={styles.legendRow}>
+                <View style={styles.legendItem}>
+                  <View style={[styles.legendDot, styles.legendAvailable]} />
+                  <Text style={styles.legendText}>Disponible</Text>
+                </View>
+                <View style={styles.legendItem}>
+                  <View style={[styles.legendDot, styles.legendBooked]} />
+                  <Text style={styles.legendText}>Completo</Text>
+                </View>
+              </View>
+              <ScrollView contentContainerStyle={styles.grid}>
+                {slots.map((slot) => {
+                  const isPast = slot.getTime() < minimumDateTime.getTime();
+                  const bookedCount = bookedTimes.filter(
+                    (t) => Math.abs(t.getTime() - slot.getTime()) < SLOT_MINUTES * 60 * 1000
+                  ).length;
+                  const isFull = activeDriverCount <= 0 || bookedCount >= activeDriverCount;
+                  const isSelected =
+                    slot.getHours() === selected.getHours() && slot.getMinutes() === selected.getMinutes();
+                  const disabled = isPast || isFull;
+
+                  return (
+                    <Pressable
+                      key={slot.toISOString()}
+                      disabled={disabled}
+                      onPress={() => {
+                        onSelect(slot);
+                        onClose();
+                      }}
+                      style={[
+                        styles.slot,
+                        isFull && styles.slotBooked,
+                        isSelected && styles.slotSelected,
+                        disabled && styles.slotDisabled,
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.slotText,
+                          isFull && styles.slotTextBooked,
+                          isSelected && styles.slotTextSelected,
+                          disabled && styles.slotTextDisabled,
+                        ]}
+                      >
+                        {slot.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            </>
+          )}
+
           <Pressable style={styles.closeButton} onPress={onClose}>
             <Text style={styles.closeButtonText}>Cerrar</Text>
           </Pressable>
@@ -109,6 +127,7 @@ const styles = StyleSheet.create({
     maxHeight: "75%",
   },
   title: { fontSize: 18, fontWeight: "800", color: "#111827", marginBottom: 8 },
+  closedText: { fontSize: 14, color: "#6B7280", paddingVertical: 20, textAlign: "center" },
   legendRow: { flexDirection: "row", gap: 16, marginBottom: 12 },
   legendItem: { flexDirection: "row", alignItems: "center", gap: 6 },
   legendDot: { width: 10, height: 10, borderRadius: 5 },

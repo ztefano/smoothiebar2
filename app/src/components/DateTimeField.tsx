@@ -2,12 +2,15 @@ import { useRef, useState } from "react";
 import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { TimeSlotGrid } from "@/components/TimeSlotGrid";
+import type { BusinessHours } from "@/types";
 
 interface DateTimeFieldProps {
   label: string;
   value: Date;
   minimumDate: Date;
   bookedTimes: Date[];
+  activeDriverCount: number;
+  businessHours: BusinessHours[];
   onChange: (date: Date) => void;
 }
 
@@ -16,7 +19,15 @@ interface DateTimeFieldProps {
  * del sistema; la hora se elige después con una grilla (TimeSlotGrid) en
  * vez del reloj nativo, para que se vean rápido los horarios ya ocupados.
  */
-export function DateTimeField({ label, value, minimumDate, bookedTimes, onChange }: DateTimeFieldProps) {
+export function DateTimeField({
+  label,
+  value,
+  minimumDate,
+  bookedTimes,
+  activeDriverCount,
+  businessHours,
+  onChange,
+}: DateTimeFieldProps) {
   const [step, setStep] = useState<"none" | "date" | "time">("none");
   const pendingDateRef = useRef<Date | null>(null);
 
@@ -57,6 +68,8 @@ export function DateTimeField({ label, value, minimumDate, bookedTimes, onChange
         date={pendingDateRef.current ?? value}
         minimumDateTime={minimumDate}
         bookedTimes={bookedTimes}
+        activeDriverCount={activeDriverCount}
+        businessHours={businessHours}
         selected={value}
         onSelect={handleTimeSelect}
         onClose={() => setStep("none")}

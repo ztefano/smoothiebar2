@@ -49,7 +49,8 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { fullName, lastName, phone, email, password } = await req.json();
+    const { fullName, lastName, phone, email, password, dni, licenseType, address, nationality } =
+      await req.json();
     if (!fullName || !lastName || !email || !password) throw new Error("Faltan datos del chofer.");
 
     // Cliente con la service role key: puede crear usuarios directamente.
@@ -63,6 +64,10 @@ Deno.serve(async (req) => {
         last_name: lastName,
         phone: phone ?? null,
         role: "driver",
+        dni: dni ?? null,
+        license_type: licenseType ?? null,
+        address: address ?? null,
+        nationality: nationality ?? null,
       },
     });
 

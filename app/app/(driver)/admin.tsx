@@ -6,6 +6,7 @@ import {
   FlatList,
   Pressable,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   View,
@@ -14,16 +15,23 @@ import { useAuth } from "@/state/AuthContext";
 import { supabase } from "@/lib/supabase";
 import type { Profile } from "@/types";
 
-/** Panel de admin: crea cuentas de chofer (sin autorregistro) y las lista. */
+/** Panel de admin: crea cuentas de chofer (sin autorregistro), las lista y
+ * permite activarlas/desactivarlas (afecta cuántos horarios puede agendar
+ * el cliente a la vez). */
 export default function AdminScreen() {
   const { profile } = useAuth();
   const [fullName, setFullName] = useState("");
   const [lastName, setLastName] = useState("");
+  const [dni, setDni] = useState("");
+  const [licenseType, setLicenseType] = useState("");
+  const [address, setAddress] = useState("");
+  const [nationality, setNationality] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [drivers, setDrivers] = useState<Profile[]>([]);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
 
   const loadDrivers = useCallback(async () => {
     const { data } = await supabase
@@ -58,6 +66,10 @@ export default function AdminScreen() {
           phone: phone.trim(),
           email: email.trim(),
           password,
+          dni: dni.trim(),
+          licenseType: licenseType.trim(),
+          address: address.trim(),
+          nationality: nationality.trim(),
         },
       });
       if (error) throw error;
@@ -65,6 +77,10 @@ export default function AdminScreen() {
       Alert.alert("Listo", `Se creó la cuenta de chofer para ${email.trim()}.`);
       setFullName("");
       setLastName("");
+      setDni("");
+      setLicenseType("");
+      setAddress("");
+      setNationality("");
       setPhone("");
       setEmail("");
       setPassword("");
@@ -74,6 +90,17 @@ export default function AdminScreen() {
     } finally {
       setSubmitting(false);
     }
+  }
+
+  async function toggleActive(driver: Profile, value: boolean) {
+    setTogglingId(driver.id);
+    setDrivers((prev) => prev.map((d) => (d.id === driver.id ? { ...d, is_active: value } : d)));
+    const { error } = await supabase.from("profiles").update({ is_active: value }).eq("id", driver.id);
+    if (error) {
+      setDrivers((prev) => prev.map((d) => (d.id === driver.id ? { ...d, is_active: !value } : d)));
+      Alert.alert("No se pudo actualizar", error.message);
+    }
+    setTogglingId(null);
   }
 
   return (
@@ -92,6 +119,25 @@ export default function AdminScreen() {
 
           <TextInput style={styles.input} placeholder="Nombre" value={fullName} onChangeText={setFullName} />
           <TextInput style={styles.input} placeholder="Apellido" value={lastName} onChangeText={setLastName} />
+          <TextInput
+            style={styles.input}
+            placeholder="Documento de identidad"
+            value={dni}
+            onChangeText={setDni}
+          />
+          <TextInput
+            style={styles.input}
+            placeholder="Tipo de carnet (ej: B, BTP)"
+            value={licenseType}
+            onChangeText={setLicenseType}
+          />
+          <TextInput style={styles.input} placeholder="Dirección" value={address} onChangeText={setAddress} />
+          <TextInput
+            style={styles.input}
+            placeholder="Nacionalidad"
+            value={nationality}
+            onChangeText={setNationality}
+          />
           <TextInput style={styles.input} placeholder="Teléfono" keyboardType="phone-pad" value={phone} onChangeText={setPhone} />
           <TextInput
             style={styles.input}
@@ -122,10 +168,21 @@ export default function AdminScreen() {
       ListEmptyComponent={<Text style={styles.empty}>Todavía no creaste ningún chofer.</Text>}
       renderItem={({ item }) => (
         <View style={styles.card}>
-          <Text style={styles.driverName}>
-            {item.full_name} {item.last_name}
-          </Text>
+          <View style={styles.cardHeader}>
+            <Text style={styles.driverName}>
+              {item.full_name} {item.last_name}
+            </Text>
+            <Switch
+              value={item.is_active}
+              onValueChange={(value) => toggleActive(item, value)}
+              disabled={togglingId === item.id}
+            />
+          </View>
           <Text style={styles.driverMeta}>{item.phone ?? "Sin teléfono"}</Text>
+          {item.dni ? <Text style={styles.driverMeta}>DNI: {item.dni}</Text> : null}
+          <Text style={[styles.status, item.is_active ? styles.active : styles.inactive]}>
+            {item.is_active ? "Activo" : "Inactivo"}
+          </Text>
           <Text style={[styles.status, item.is_online ? styles.online : styles.offline]}>
             {item.is_online ? "Disponible" : "Desconectado"}
           </Text>
@@ -161,9 +218,12 @@ const styles = StyleSheet.create({
     borderColor: "#E5E7EB",
     gap: 2,
   },
+  cardHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   driverName: { fontWeight: "700", fontSize: 15, color: "#111827" },
   driverMeta: { fontSize: 13, color: "#6B7280" },
   status: { fontSize: 12, fontWeight: "600", marginTop: 4 },
+  active: { color: "#16A34A" },
+  inactive: { color: "#DC2626" },
   online: { color: "#16A34A" },
   offline: { color: "#9CA3AF" },
 });

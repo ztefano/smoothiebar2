@@ -1,46 +1,74 @@
 import { StyleSheet, Text, View } from "react-native";
-import MapView, { Marker } from "react-native-maps";
+import MapView, { Marker, Polyline } from "react-native-maps";
 import type { Coordinates } from "@/types";
 import { useDirectionsEta } from "@/hooks/useDirectionsEta";
 
 interface LiveTrackingMapProps {
-  pickup: Coordinates;
+  /** Punto al que se navega en esta etapa (punto de encuentro o destino final). */
+  target: Coordinates;
+  targetLabel: string;
   driverLocation: Coordinates | null;
+  /** true en la pantalla del propio chofer: usa el punto azul nativo de GPS. */
+  showsOwnLocation?: boolean;
 }
 
-/** Mapa con el pin del cliente y el del chofer moviéndose en tiempo real. */
-export function LiveTrackingMap({ pickup, driverLocation }: LiveTrackingMapProps) {
-  const eta = useDirectionsEta(pickup, driverLocation);
+/** Mapa con navegación: ruta real hacia el objetivo vigente (punto de
+ * encuentro o destino final) y la posición del chofer en tiempo real. */
+export function LiveTrackingMap({
+  target,
+  targetLabel,
+  driverLocation,
+  showsOwnLocation,
+}: LiveTrackingMapProps) {
+  const eta = useDirectionsEta(target, driverLocation);
+
+  const initialRegion = {
+    latitude: driverLocation?.lat ?? target.lat,
+    longitude: driverLocation?.lng ?? target.lng,
+    latitudeDelta: 0.02,
+    longitudeDelta: 0.02,
+  };
 
   return (
     <View style={styles.container}>
       <MapView
         style={styles.map}
-        initialRegion={{
-          latitude: pickup.lat,
-          longitude: pickup.lng,
-          latitudeDelta: 0.02,
-          longitudeDelta: 0.02,
-        }}
+        initialRegion={initialRegion}
+        showsUserLocation={showsOwnLocation}
+        followsUserLocation={showsOwnLocation}
+        showsMyLocationButton={false}
       >
         <Marker
-          coordinate={{ latitude: pickup.lat, longitude: pickup.lng }}
-          title="Punto de encuentro"
+          coordinate={{ latitude: target.lat, longitude: target.lng }}
+          title={targetLabel}
           pinColor="#2563EB"
         />
-        {driverLocation ? (
+
+        {!showsOwnLocation && driverLocation ? (
           <Marker
             coordinate={{ latitude: driverLocation.lat, longitude: driverLocation.lng }}
             title="Tu chofer"
-            pinColor="#16A34A"
+            anchor={{ x: 0.5, y: 0.5 }}
+          >
+            <View style={styles.driverDotOuter}>
+              <View style={styles.driverDotInner} />
+            </View>
+          </Marker>
+        ) : null}
+
+        {eta && eta.polyline.length > 1 ? (
+          <Polyline
+            coordinates={eta.polyline.map((p) => ({ latitude: p.lat, longitude: p.lng }))}
+            strokeColor="#2563EB"
+            strokeWidth={4}
           />
         ) : null}
       </MapView>
       <View style={styles.statusBar}>
         <Text style={styles.statusText}>
           {eta
-            ? `Chofer a ${eta.distanceKm.toFixed(1)} km · ETA ~${eta.etaMinutes} min`
-            : "Esperando la ubicación del chofer…"}
+            ? `${targetLabel}: ${eta.distanceKm.toFixed(1)} km · ETA ~${eta.etaMinutes} min`
+            : "Esperando ubicación del chofer…"}
         </Text>
       </View>
     </View>
@@ -55,4 +83,20 @@ const styles = StyleSheet.create({
     backgroundColor: "#111827",
   },
   statusText: { color: "white", textAlign: "center", fontWeight: "600" },
+  driverDotOuter: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: "rgba(37,99,235,0.25)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  driverDotInner: {
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: "#2563EB",
+    borderWidth: 2,
+    borderColor: "white",
+  },
 });

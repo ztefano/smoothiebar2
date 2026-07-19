@@ -10,21 +10,24 @@ export interface EtaEstimate {
   etaMinutes: number;
   /** "route" = Directions API (real por calles), "straight-line" = fallback. */
   source: "route" | "straight-line";
+  polyline: Coordinates[];
 }
 
 /**
- * ETA entre el chofer y el punto de encuentro. Muestra al instante una
+ * ETA y ruta entre el chofer y un destino (punto de encuentro o destino
+ * final, según en qué etapa del viaje esté). Muestra al instante una
  * estimación en línea recta y la va reemplazando por la ruta real de
  * Google Directions, sin pedir una ruta nueva en cada actualización de
  * ubicación (el chofer publica su posición cada pocos segundos).
  */
 export function useDirectionsEta(
-  pickup: Coordinates,
+  target: Coordinates,
   driverLocation: Coordinates | null
 ): EtaEstimate | null {
   const [estimate, setEstimate] = useState<EtaEstimate | null>(null);
   const lastFetchRef = useRef(0);
   const lastFetchedLocationRef = useRef<Coordinates | null>(null);
+  const lastTargetRef = useRef<Coordinates>(target);
 
   useEffect(() => {
     if (!driverLocation) {
@@ -32,11 +35,22 @@ export function useDirectionsEta(
       return;
     }
 
-    const distanceKm = haversineDistanceKm(driverLocation, pickup);
+    // Si cambió el objetivo (ej: de punto de encuentro a destino final al
+    // iniciar el viaje), se descarta la ruta vieja y se fuerza pedir una nueva.
+    const targetChanged =
+      lastTargetRef.current.lat !== target.lat || lastTargetRef.current.lng !== target.lng;
+    if (targetChanged) {
+      lastTargetRef.current = target;
+      lastFetchRef.current = 0;
+      lastFetchedLocationRef.current = null;
+    }
+
+    const distanceKm = haversineDistanceKm(driverLocation, target);
     setEstimate((prev) => ({
       distanceKm,
       etaMinutes: estimateEtaMinutes(distanceKm),
-      source: prev?.source === "route" ? prev.source : "straight-line",
+      source: !targetChanged && prev?.source === "route" ? prev.source : "straight-line",
+      polyline: !targetChanged ? (prev?.polyline ?? []) : [],
     }));
 
     const now = Date.now();
@@ -49,15 +63,17 @@ export function useDirectionsEta(
     lastFetchRef.current = now;
     lastFetchedLocationRef.current = driverLocation;
 
-    fetchDrivingRoute(driverLocation, pickup).then((route) => {
+    fetchDrivingRoute(driverLocation, target).then((route) => {
       if (!route) return;
       setEstimate({
         distanceKm: route.distanceKm,
         etaMinutes: route.durationMinutes,
         source: "route",
+        polyline: route.polyline,
       });
     });
-  }, [driverLocation, pickup]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [driverLocation?.lat, driverLocation?.lng, target.lat, target.lng]);
 
   return estimate;
 }

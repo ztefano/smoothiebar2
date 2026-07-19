@@ -33,6 +33,15 @@ export default function ClientTripScreen() {
 
   const showMap = booking.status === "accepted" || booking.status === "in_progress";
   const isPaid = payment?.status === "approved";
+  const dropoff =
+    booking.dropoff_lat != null && booking.dropoff_lng != null
+      ? { lat: booking.dropoff_lat, lng: booking.dropoff_lng }
+      : null;
+  const navigatingToDestination = booking.status === "in_progress" && dropoff;
+  const target = navigatingToDestination
+    ? dropoff!
+    : { lat: booking.pickup_lat, lng: booking.pickup_lng };
+  const targetLabel = navigatingToDestination ? "Destino" : "Punto de encuentro";
 
   function statusText() {
     if (booking!.status === "pending" && !paymentLoading) {
@@ -87,10 +96,7 @@ export default function ClientTripScreen() {
   return (
     <View style={styles.container}>
       {showMap ? (
-        <LiveTrackingMap
-          pickup={{ lat: booking.pickup_lat, lng: booking.pickup_lng }}
-          driverLocation={driverLocation}
-        />
+        <LiveTrackingMap target={target} targetLabel={targetLabel} driverLocation={driverLocation} />
       ) : (
         <View style={styles.center}>
           <ActivityIndicator />

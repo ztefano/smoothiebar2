@@ -13,6 +13,7 @@ import { InspectionConfirm } from "@/components/InspectionConfirm";
 import { confirmCashPayment } from "@/lib/payments";
 import { formatEuros } from "@/lib/pricing";
 import { supabase } from "@/lib/supabase";
+import { haversineDistanceKm } from "@/lib/distance";
 import type { Coordinates, DamageEntry, InspectionGeneralStatus } from "@/types";
 
 interface ClientInfo {
@@ -20,6 +21,8 @@ interface ClientInfo {
   last_name: string | null;
   phone: string | null;
 }
+
+const ARRIVAL_THRESHOLD_KM = 0.15;
 
 export default function DriverTripScreen() {
   const { profile } = useAuth();
@@ -33,6 +36,7 @@ export default function DriverTripScreen() {
   const [generalStatus, setGeneralStatus] = useState<InspectionGeneralStatus | null>(null);
   const [clientName, setClientName] = useState("");
   const [confirming, setConfirming] = useState(false);
+  const [forceShowFinish, setForceShowFinish] = useState(false);
 
   const isSharingLocation = booking?.status === "accepted" || booking?.status === "in_progress";
 
@@ -131,12 +135,25 @@ export default function DriverTripScreen() {
   }
 
   const needsInspection = booking.status === "accepted" && !inspection;
+  const dropoff: Coordinates | null =
+    booking.dropoff_lat != null && booking.dropoff_lng != null
+      ? { lat: booking.dropoff_lat, lng: booking.dropoff_lng }
+      : null;
+  const navigatingToDestination = booking.status === "in_progress" && dropoff;
+  const target = navigatingToDestination ? dropoff! : { lat: booking.pickup_lat, lng: booking.pickup_lng };
+  const targetLabel = navigatingToDestination ? "Destino" : "Punto de encuentro";
+  const hasArrived =
+    !!navigatingToDestination &&
+    !!myLocation &&
+    haversineDistanceKm(myLocation, dropoff!) <= ARRIVAL_THRESHOLD_KM;
 
   return (
     <View style={styles.container}>
       <LiveTrackingMap
-        pickup={{ lat: booking.pickup_lat, lng: booking.pickup_lng }}
+        target={target}
+        targetLabel={targetLabel}
         driverLocation={myLocation}
+        showsOwnLocation
       />
 
       <ScrollView style={styles.footer} contentContainerStyle={styles.footerContent}>
@@ -184,9 +201,17 @@ export default function DriverTripScreen() {
                 {inspection.damages.length > 0 ? ` · ${inspection.damages.length} desperfecto(s) registrados` : ""}
               </Text>
             ) : null}
-            <Pressable style={[styles.button, styles.completeButton]} onPress={handleComplete}>
-              <Text style={styles.buttonText}>Finalizar viaje</Text>
-            </Pressable>
+            {hasArrived || forceShowFinish ? (
+              <Pressable style={[styles.button, styles.completeButton]} onPress={handleComplete}>
+                <Text style={styles.buttonText}>Finalizar viaje</Text>
+              </Pressable>
+            ) : (
+              <Pressable onPress={() => setForceShowFinish(true)}>
+                <Text style={styles.arrivalHint}>
+                  El botón para finalizar aparece al llegar al destino. ¿Ya llegaste? Tocá acá.
+                </Text>
+              </Pressable>
+            )}
           </>
         ) : null}
 
@@ -227,4 +252,5 @@ const styles = StyleSheet.create({
   },
   inspectionTitle: { fontSize: 15, fontWeight: "800", color: "#111827" },
   inspectionSummary: { fontSize: 12, color: "#6B7280", marginTop: 6 },
+  arrivalHint: { fontSize: 13, color: "#2563EB", fontWeight: "600", textAlign: "center", marginTop: 10 },
 });

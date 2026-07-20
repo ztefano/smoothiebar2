@@ -57,6 +57,7 @@ module.exports = ({ config }) => ({
   },
   android: {
     package: "com.choferdereemplazo.app",
+    googleServicesFile: "./google-services.json",
     permissions: ["ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION"],
     config: {
       googleMaps: {

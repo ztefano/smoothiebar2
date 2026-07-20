@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "631263605882",
+    "project_id": "choferdereemplazo-8d3c4",
+    "storage_bucket": "choferdereemplazo-8d3c4.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:631263605882:android:ffaa0184fd71ac5f4677c3",
+        "android_client_info": {
+          "package_name": "com.choferdereemplazo.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA88ABf-OT1zgvfecAK-WaBasdpzACoCbo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

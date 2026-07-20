@@ -84,27 +84,28 @@ Deno.serve(async (req) => {
 
     if (error) throw error;
 
-    // Respaldo por si la función desplegada en el dashboard no coincide
-    // todavía con esta versión, o el trigger no llegó a correr: nos
-    // aseguramos server-side (service role, sin RLS) de que el perfil
-    // quede con el rol y los datos correctos. Si esto falla (por ejemplo
-    // porque falta la columna document_type, o sea porque no se corrió la
-    // migración 0015) lo reportamos en vez de devolver éxito igual.
+    // No confiamos en que el trigger de la base haya creado la fila en
+    // profiles (en algunos proyectos ese trigger nunca llegó a instalarse):
+    // la creamos/actualizamos acá directamente, server-side con la service
+    // role key, así el perfil siempre queda bien sin importar el trigger.
     const { error: syncError } = await admin
       .from("profiles")
-      .update({
-        role: "driver",
-        is_active: true,
-        full_name: fullName,
-        last_name: lastName,
-        phone: phone ?? null,
-        dni: dni ?? null,
-        document_type: documentType ?? null,
-        license_type: licenseType ?? null,
-        address: address ?? null,
-        nationality: nationality ?? null,
-      })
-      .eq("id", created.user.id);
+      .upsert(
+        {
+          id: created.user.id,
+          role: "driver",
+          is_active: true,
+          full_name: fullName,
+          last_name: lastName,
+          phone: phone ?? null,
+          dni: dni ?? null,
+          document_type: documentType ?? null,
+          license_type: licenseType ?? null,
+          address: address ?? null,
+          nationality: nationality ?? null,
+        },
+        { onConflict: "id" }
+      );
 
     if (syncError) {
       throw new Error(

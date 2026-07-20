@@ -101,6 +101,15 @@ export default function DriverTripScreen() {
     );
   }
 
+  function handleStartService() {
+    setServiceStarted(true);
+    sendPushToUsers(
+      [booking!.client_id],
+      "Tu chofer llegó",
+      `${profile?.full_name ?? "Tu chofer"} está en el punto de encuentro.`
+    );
+  }
+
   async function handleSubmitInspection() {
     if (!profile) return;
     const effectiveStatus = damages.length > 0 ? "detail" : generalStatus;
@@ -294,7 +303,7 @@ export default function DriverTripScreen() {
 
         {canStartInspection ? (
           hasArrivedPickup || forceShowInspectionStart ? (
-            <Pressable style={styles.button} onPress={() => setServiceStarted(true)}>
+            <Pressable style={styles.button} onPress={handleStartService}>
               <Text style={styles.buttonText}>Iniciar servicio</Text>
             </Pressable>
           ) : (

@@ -87,8 +87,10 @@ Deno.serve(async (req) => {
     // Respaldo por si la función desplegada en el dashboard no coincide
     // todavía con esta versión, o el trigger no llegó a correr: nos
     // aseguramos server-side (service role, sin RLS) de que el perfil
-    // quede con el rol y los datos correctos.
-    await admin
+    // quede con el rol y los datos correctos. Si esto falla (por ejemplo
+    // porque falta la columna document_type, o sea porque no se corrió la
+    // migración 0015) lo reportamos en vez de devolver éxito igual.
+    const { error: syncError } = await admin
       .from("profiles")
       .update({
         role: "driver",
@@ -103,6 +105,13 @@ Deno.serve(async (req) => {
         nationality: nationality ?? null,
       })
       .eq("id", created.user.id);
+
+    if (syncError) {
+      throw new Error(
+        `El usuario se creó, pero no se pudo completar el perfil: ${syncError.message}. ` +
+          `¿Corriste la migración 0015_document_type.sql en el SQL Editor de Supabase?`
+      );
+    }
 
     return new Response(JSON.stringify({ userId: created.user.id }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

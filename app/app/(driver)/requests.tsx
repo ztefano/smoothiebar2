@@ -137,9 +137,15 @@ export default function DriverRequestsScreen() {
         .eq("id", assigningBookingId)
         .eq("status", "pending") // evita asignar dos veces la misma reserva
         .select("client_id")
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
+      if (!data) {
+        throw new Error(
+          "No se modificó ninguna reserva. La reserva puede ya no estar pendiente, o falta correr la " +
+            "migración 0016_admin_assigns_driver.sql en el SQL Editor de Supabase."
+        );
+      }
 
       if (data?.client_id) {
         sendPushToUsers(

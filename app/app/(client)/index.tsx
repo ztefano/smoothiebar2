@@ -126,18 +126,21 @@ export default function RequestChoferScreen() {
     return data.id as string;
   }
 
-  function notifyActiveDrivers() {
+  // El auto-aceptar de los choferes ya no existe (lo asigna el admin), así
+  // que quien tiene que enterarse de una reserva nueva es el admin, no
+  // cualquier chofer activo.
+  function notifyAdmins(bookingId: string) {
     supabase
       .from("profiles")
       .select("id")
-      .eq("role", "driver")
-      .eq("is_active", true)
-      .then(({ data: drivers }) => {
-        const ids = (drivers ?? []).map((d) => d.id as string);
+      .eq("is_admin", true)
+      .then(({ data: admins }) => {
+        const ids = (admins ?? []).map((a) => a.id as string);
         sendPushToUsers(
           ids,
           "Nueva solicitud",
-          `${address.trim()} → ${dropoffAddress.trim()} · ${scheduledAt.toLocaleString("es-ES")}`
+          `${address.trim()} → ${dropoffAddress.trim()} · ${scheduledAt.toLocaleString("es-ES")}`,
+          { bookingId }
         );
       });
   }
@@ -147,7 +150,7 @@ export default function RequestChoferScreen() {
     setSubmitting(true);
     try {
       const bookingId = await createBooking(priceEstimate);
-      notifyActiveDrivers();
+      notifyAdmins(bookingId);
       router.replace(`/payment/checkout?bookingId=${bookingId}`);
     } catch (err) {
       Alert.alert("No se pudo crear la reserva", (err as Error).message);
@@ -161,7 +164,7 @@ export default function RequestChoferScreen() {
     setSubmitting(true);
     try {
       const bookingId = await createBooking(cashPrice);
-      notifyActiveDrivers();
+      notifyAdmins(bookingId);
       await requestCashPayment(bookingId, cashPrice);
       Alert.alert(
         "Reserva confirmada",

@@ -10,10 +10,11 @@ import { StartInspectionReview } from "@/components/StartInspectionReview";
 import { ReturnInspectionReview } from "@/components/ReturnInspectionReview";
 import { requestCashPayment } from "@/lib/payments";
 import { formatEuros } from "@/lib/pricing";
+import { sendPushToUsers } from "@/lib/pushSend";
 
 const STATUS_COPY: Record<string, string> = {
   pending: "Buscando un chofer disponible…",
-  accepted: "Un chofer aceptó tu viaje y está en camino.",
+  accepted: "Se te asignó un chofer. Ya está en camino.",
   in_progress: "Tu chofer está manejando tu vehículo.",
   completed: "Viaje completado.",
   cancelled: "Este viaje fue cancelado.",
@@ -112,7 +113,17 @@ export default function ClientTripScreen() {
         <StartInspectionReview
           inspection={inspection}
           defaultName={defaultName}
-          onConfirm={({ name, lat, lng }) => confirmStart({ name, method: "client_device", lat, lng })}
+          onConfirm={async ({ name, lat, lng }) => {
+            await confirmStart({ name, method: "client_device", lat, lng });
+            if (booking.driver_id) {
+              sendPushToUsers(
+                [booking.driver_id],
+                "El cliente confirmó la revisión",
+                "Ya podés arrancar el viaje.",
+                { bookingId: booking.id }
+              );
+            }
+          }}
         />
       </ScrollView>
     );
@@ -124,9 +135,17 @@ export default function ClientTripScreen() {
         <ReturnInspectionReview
           bookingId={booking.id}
           defaultName={defaultName}
-          onConfirm={({ status, note, damages, name, lat, lng }) =>
-            confirmReturn({ status, note, damages, name, method: "client_device", lat, lng })
-          }
+          onConfirm={async ({ status, note, damages, name, lat, lng }) => {
+            await confirmReturn({ status, note, damages, name, method: "client_device", lat, lng });
+            if (booking.driver_id) {
+              sendPushToUsers(
+                [booking.driver_id],
+                "El cliente confirmó la vuelta",
+                "Ya podés cerrar el viaje.",
+                { bookingId: booking.id }
+              );
+            }
+          }}
         />
       </ScrollView>
     );

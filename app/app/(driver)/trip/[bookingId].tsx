@@ -106,7 +106,8 @@ export default function DriverTripScreen() {
     sendPushToUsers(
       [booking!.client_id],
       "Tu chofer llegó",
-      `${profile?.full_name ?? "Tu chofer"} está en el punto de encuentro.`
+      `${profile?.full_name ?? "Tu chofer"} está en el punto de encuentro.`,
+      { bookingId: booking!.id }
     );
   }
 
@@ -123,7 +124,8 @@ export default function DriverTripScreen() {
       sendPushToUsers(
         [booking!.client_id],
         "Confirmá el estado de tu vehículo",
-        "Revisá y confirmá desde tu teléfono antes de que el chofer arranque."
+        "Revisá y confirmá desde tu teléfono antes de que el chofer arranque.",
+        { bookingId: booking!.id }
       );
     } catch (err) {
       Alert.alert("Error", (err as Error).message);
@@ -157,7 +159,8 @@ export default function DriverTripScreen() {
       sendPushToUsers(
         [booking!.client_id],
         "Confirmá el estado del vehículo",
-        "El viaje llegó a destino. Confirmá desde tu teléfono cómo quedó el vehículo."
+        "El viaje llegó a destino. Confirmá desde tu teléfono cómo quedó el vehículo.",
+        { bookingId: booking!.id }
       );
     } catch (err) {
       Alert.alert("Error", (err as Error).message);

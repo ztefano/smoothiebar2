@@ -120,7 +120,8 @@ export default function DriverRequestsScreen() {
           sendPushToUsers(
             [booking.client_id],
             "Tu reserva fue cancelada",
-            "Contactanos si tenés dudas sobre tu viaje."
+            "Contactanos si tenés dudas sobre tu viaje.",
+            { bookingId: booking.id }
           );
         },
       },
@@ -150,14 +151,16 @@ export default function DriverRequestsScreen() {
       if (data?.client_id) {
         sendPushToUsers(
           [data.client_id as string],
-          "¡Tu chofer está en camino!",
-          `${driver.full_name} fue asignado a tu viaje.`
+          "Se te ha asignado un chofer",
+          `${driver.full_name} fue asignado a tu viaje y ya está en camino.`,
+          { bookingId: assigningBookingId }
         );
       }
       sendPushToUsers(
         [driver.id],
-        "Nuevo servicio asignado",
-        "Tenés un viaje nuevo asignado. Revisalo en Servicio."
+        "¡Recibiste un viaje!",
+        "Tenés un viaje nuevo asignado. Revisalo en Servicio.",
+        { bookingId: assigningBookingId }
       );
       setAssigningBookingId(null);
     } catch (err) {

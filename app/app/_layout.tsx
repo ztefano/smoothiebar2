@@ -1,9 +1,13 @@
-import { Stack } from "expo-router";
+import { useEffect } from "react";
+import { Stack, router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import * as WebBrowser from "expo-web-browser";
+import * as Notifications from "expo-notifications";
 import { AuthProvider, useAuth } from "@/state/AuthContext";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { UpdateFab } from "@/components/UpdateFab";
+import { IncomingTripAlert } from "@/components/IncomingTripAlert";
+import { DriverAssignedAlert } from "@/components/DriverAssignedAlert";
 
 // Recomendado por Expo para flujos de OAuth con WebBrowser: resuelve
 // cualquier sesión de navegador que haya quedado pendiente al volver a
@@ -13,7 +17,28 @@ WebBrowser.maybeCompleteAuthSession();
 function PushNotificationRegistrar() {
   const { profile } = useAuth();
   usePushNotifications(profile?.id ?? null);
+
+  // Al tocar una notificación (con la app abierta, en segundo plano o
+  // cerrada), navega directo al viaje al que corresponde en vez de dejar
+  // a la persona en cualquier pantalla en la que haya quedado la app.
+  useEffect(() => {
+    const sub = Notifications.addNotificationResponseReceivedListener((response) => {
+      const data = response.notification.request.content.data as { bookingId?: string } | undefined;
+      if (!data?.bookingId || !profile) return;
+      const path = profile.role === "driver" ? "/(driver)/trip/" : "/(client)/trip/";
+      router.push(`${path}${data.bookingId}`);
+    });
+    return () => sub.remove();
+  }, [profile]);
+
   return null;
+}
+
+function TripAlerts() {
+  const { profile } = useAuth();
+  if (!profile) return null;
+  if (profile.role === "driver") return <IncomingTripAlert driverId={profile.id} />;
+  return <DriverAssignedAlert clientId={profile.id} />;
 }
 
 function AdminUpdateFab() {
@@ -36,6 +61,7 @@ export default function RootLayout() {
         <Stack.Screen name="(driver)" />
         <Stack.Screen name="payment" />
       </Stack>
+      <TripAlerts />
       <AdminUpdateFab />
     </AuthProvider>
   );

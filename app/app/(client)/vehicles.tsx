@@ -13,6 +13,7 @@ import { useAuth } from "@/state/AuthContext";
 import { useVehicles, formatVehicle } from "@/hooks/useVehicles";
 import { SelectModal } from "@/components/SelectModal";
 import { CAR_BRANDS, modelsForBrand } from "@/lib/carCatalog";
+import { isValidSpanishPlate } from "@/lib/vehiclePlates";
 
 export default function VehiclesScreen() {
   const { profile } = useAuth();
@@ -25,6 +26,10 @@ export default function VehiclesScreen() {
   async function handleAdd() {
     if (!brand.trim() && !model.trim() && !plate.trim()) {
       Alert.alert("Faltan datos", "Completá al menos la marca o la patente.");
+      return;
+    }
+    if (plate.trim() && !isValidSpanishPlate(plate)) {
+      Alert.alert("Matrícula inválida", "Revisá el formato de la matrícula (ej: 1234 BCD).");
       return;
     }
     setSubmitting(true);
@@ -60,6 +65,7 @@ export default function VehiclesScreen() {
   }
 
   const models = modelsForBrand(brand);
+  const plateError = plate.trim().length > 0 && !isValidSpanishPlate(plate);
 
   return (
     <FlatList
@@ -90,7 +96,14 @@ export default function VehiclesScreen() {
             />
           </View>
 
-          <TextInput style={styles.input} placeholder="Patente" value={plate} onChangeText={setPlate} />
+          <TextInput
+            style={[styles.input, plateError && styles.inputError]}
+            placeholder="Patente (ej: 1234 BCD)"
+            autoCapitalize="characters"
+            value={plate}
+            onChangeText={setPlate}
+          />
+          {plateError ? <Text style={styles.errorText}>Formato de matrícula no válido.</Text> : null}
           <Pressable style={styles.addButton} onPress={handleAdd} disabled={submitting}>
             {submitting ? (
               <ActivityIndicator color="white" />
@@ -133,6 +146,8 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     fontSize: 15,
   },
+  inputError: { borderColor: "#DC2626" },
+  errorText: { fontSize: 12, color: "#DC2626" },
   addButton: { backgroundColor: "#111827", borderRadius: 10, paddingVertical: 14, alignItems: "center" },
   addButtonText: { color: "white", fontWeight: "700", fontSize: 15 },
   empty: { textAlign: "center", color: "#6B7280", marginTop: 20 },

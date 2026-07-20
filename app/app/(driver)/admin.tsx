@@ -13,7 +13,26 @@ import {
 } from "react-native";
 import { useAuth } from "@/state/AuthContext";
 import { supabase } from "@/lib/supabase";
+import { SelectModal } from "@/components/SelectModal";
+import { NATIONALITIES } from "@/lib/countries";
+import { DOCUMENT_TYPES, LICENSE_TYPES } from "@/lib/licenseTypes";
 import type { Profile } from "@/types";
+
+/** El cliente de supabase-js envuelve los errores no-2xx de una Edge
+ * Function en un mensaje genérico; el motivo real viene en el body de la
+ * respuesta, hay que leerlo aparte. */
+async function extractFunctionErrorMessage(error: unknown): Promise<string> {
+  const withContext = error as { context?: Response; message?: string };
+  if (withContext?.context && typeof withContext.context.json === "function") {
+    try {
+      const body = await withContext.context.json();
+      if (body?.error) return body.error as string;
+    } catch {
+      // sin body JSON legible, usamos el mensaje genérico de abajo
+    }
+  }
+  return withContext?.message ?? "Error desconocido.";
+}
 
 /** Panel de admin: crea cuentas de chofer (sin autorregistro), las lista y
  * permite activarlas/desactivarlas (afecta cuántos horarios puede agendar
@@ -22,6 +41,7 @@ export default function AdminScreen() {
   const { profile } = useAuth();
   const [fullName, setFullName] = useState("");
   const [lastName, setLastName] = useState("");
+  const [documentType, setDocumentType] = useState("");
   const [dni, setDni] = useState("");
   const [licenseType, setLicenseType] = useState("");
   const [address, setAddress] = useState("");
@@ -59,7 +79,7 @@ export default function AdminScreen() {
     }
     setSubmitting(true);
     try {
-      const { error } = await supabase.functions.invoke("create-driver-account", {
+      const { data, error } = await supabase.functions.invoke("create-driver-account", {
         body: {
           fullName: fullName.trim(),
           lastName: lastName.trim(),
@@ -67,16 +87,21 @@ export default function AdminScreen() {
           email: email.trim(),
           password,
           dni: dni.trim(),
-          licenseType: licenseType.trim(),
+          documentType: documentType || null,
+          licenseType: licenseType || null,
           address: address.trim(),
-          nationality: nationality.trim(),
+          nationality: nationality || null,
         },
       });
-      if (error) throw error;
+      if (error) throw new Error(await extractFunctionErrorMessage(error));
+      if ((data as { error?: string } | null)?.error) {
+        throw new Error((data as { error: string }).error);
+      }
 
       Alert.alert("Listo", `Se creó la cuenta de chofer para ${email.trim()}.`);
       setFullName("");
       setLastName("");
+      setDocumentType("");
       setDni("");
       setLicenseType("");
       setAddress("");
@@ -119,24 +144,38 @@ export default function AdminScreen() {
 
           <TextInput style={styles.input} placeholder="Nombre" value={fullName} onChangeText={setFullName} />
           <TextInput style={styles.input} placeholder="Apellido" value={lastName} onChangeText={setLastName} />
-          <TextInput
-            style={styles.input}
-            placeholder="Documento de identidad"
-            value={dni}
-            onChangeText={setDni}
-          />
-          <TextInput
-            style={styles.input}
-            placeholder="Tipo de carnet (ej: B, BTP)"
+
+          <View style={styles.row}>
+            <SelectModal
+              label="Tipo de documento"
+              placeholder="Tipo de documento"
+              value={documentType}
+              options={[...DOCUMENT_TYPES]}
+              allowCustom={false}
+              onSelect={setDocumentType}
+            />
+            <TextInput
+              style={[styles.input, styles.rowInput]}
+              placeholder="Número de documento"
+              value={dni}
+              onChangeText={setDni}
+            />
+          </View>
+
+          <SelectModal
+            label="Tipo de permiso"
+            placeholder="Tipo de permiso de conducir"
             value={licenseType}
-            onChangeText={setLicenseType}
+            options={LICENSE_TYPES}
+            onSelect={setLicenseType}
           />
           <TextInput style={styles.input} placeholder="Dirección" value={address} onChangeText={setAddress} />
-          <TextInput
-            style={styles.input}
+          <SelectModal
+            label="Nacionalidad"
             placeholder="Nacionalidad"
             value={nationality}
-            onChangeText={setNationality}
+            options={NATIONALITIES}
+            onSelect={setNationality}
           />
           <TextInput style={styles.input} placeholder="Teléfono" keyboardType="phone-pad" value={phone} onChangeText={setPhone} />
           <TextInput
@@ -179,7 +218,11 @@ export default function AdminScreen() {
             />
           </View>
           <Text style={styles.driverMeta}>{item.phone ?? "Sin teléfono"}</Text>
-          {item.dni ? <Text style={styles.driverMeta}>DNI: {item.dni}</Text> : null}
+          {item.dni ? (
+            <Text style={styles.driverMeta}>
+              {item.document_type ?? "Doc."}: {item.dni}
+            </Text>
+          ) : null}
           <Text style={[styles.status, item.is_active ? styles.active : styles.inactive]}>
             {item.is_active ? "Activo" : "Inactivo"}
           </Text>
@@ -198,6 +241,8 @@ const styles = StyleSheet.create({
   form: { gap: 10, marginBottom: 10 },
   title: { fontSize: 20, fontWeight: "800", color: "#111827" },
   subtitle: { fontSize: 13, color: "#6B7280" },
+  row: { flexDirection: "row", gap: 8 },
+  rowInput: { flex: 1 },
   input: {
     borderWidth: 1,
     borderColor: "#E5E7EB",

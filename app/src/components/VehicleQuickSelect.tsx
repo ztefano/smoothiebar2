@@ -1,6 +1,9 @@
 import { router } from "expo-router";
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useVehicles, formatVehicle } from "@/hooks/useVehicles";
+import { SelectModal } from "@/components/SelectModal";
+import { CAR_BRANDS, modelsForBrand } from "@/lib/carCatalog";
+import { isValidSpanishPlate } from "@/lib/vehiclePlates";
 
 export interface VehicleParts {
   brand: string;
@@ -17,31 +20,38 @@ interface VehicleQuickSelectProps {
 /** Marca/modelo/patente en 3 campos, más chips con los vehículos guardados del cliente. */
 export function VehicleQuickSelect({ clientId, value, onChange }: VehicleQuickSelectProps) {
   const { vehicles } = useVehicles(clientId);
+  const models = modelsForBrand(value.brand);
+  const plateError = value.plate.trim().length > 0 && !isValidSpanishPlate(value.plate);
 
   return (
     <View style={{ gap: 8 }}>
       <Text style={styles.label}>Vehículo</Text>
 
       <View style={styles.row}>
-        <TextInput
-          style={[styles.input, styles.inputThird]}
+        <SelectModal
+          label="Marca"
           placeholder="Marca"
           value={value.brand}
-          onChangeText={(brand) => onChange({ ...value, brand })}
+          options={CAR_BRANDS}
+          onSelect={(brand) => onChange({ ...value, brand, model: "" })}
         />
-        <TextInput
-          style={[styles.input, styles.inputThird]}
+        <SelectModal
+          label="Modelo"
           placeholder="Modelo"
           value={value.model}
-          onChangeText={(model) => onChange({ ...value, model })}
-        />
-        <TextInput
-          style={[styles.input, styles.inputThird]}
-          placeholder="Patente"
-          value={value.plate}
-          onChangeText={(plate) => onChange({ ...value, plate })}
+          options={models}
+          onSelect={(model) => onChange({ ...value, model })}
         />
       </View>
+
+      <TextInput
+        style={[styles.input, plateError && styles.inputError]}
+        placeholder="Patente (ej: 1234 BCD)"
+        autoCapitalize="characters"
+        value={value.plate}
+        onChangeText={(plate) => onChange({ ...value, plate })}
+      />
+      {plateError ? <Text style={styles.errorText}>Formato de matrícula no válido.</Text> : null}
 
       {vehicles.length > 0 ? (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
@@ -84,7 +94,6 @@ export function VehicleQuickSelect({ clientId, value, onChange }: VehicleQuickSe
 const styles = StyleSheet.create({
   label: { fontSize: 14, fontWeight: "600", color: "#111827" },
   row: { flexDirection: "row", gap: 8 },
-  inputThird: { flex: 1 },
   chipRow: { gap: 8 },
   chip: {
     borderWidth: 1,
@@ -114,4 +123,6 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     fontSize: 14,
   },
+  inputError: { borderColor: "#DC2626" },
+  errorText: { fontSize: 12, color: "#DC2626" },
 });

@@ -20,6 +20,7 @@ export interface Profile {
   is_admin: boolean;
   is_active: boolean;
   dni: string | null;
+  document_type: "DNI" | "NIE" | "Pasaporte" | null;
   license_type: string | null;
   address: string | null;
   nationality: string | null;

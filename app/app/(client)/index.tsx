@@ -18,6 +18,7 @@ import { DateTimeField } from "@/components/DateTimeField";
 import { supabase } from "@/lib/supabase";
 import { estimatePrice, applyCashDiscount, formatEuros } from "@/lib/pricing";
 import { formatVehicleParts } from "@/hooks/useVehicles";
+import { isValidSpanishPlate } from "@/lib/vehiclePlates";
 import { useBookedTimes } from "@/hooks/useBookedTimes";
 import { useBusinessHours, hoursForDate } from "@/hooks/useBusinessHours";
 import { useActiveDriverCount } from "@/hooks/useActiveDriverCount";
@@ -69,6 +70,10 @@ export default function RequestChoferScreen() {
     }
     if (!address.trim() || !dropoffAddress.trim() || !dropoff || !vehicleInfo) {
       Alert.alert("Faltan datos", "Ingresá el punto de encuentro, el destino y los datos del vehículo.");
+      return false;
+    }
+    if (!vehicle.plate.trim() || !isValidSpanishPlate(vehicle.plate)) {
+      Alert.alert("Matrícula inválida", "Ingresá la matrícula del vehículo en un formato válido (ej: 1234 BCD).");
       return false;
     }
     if (scheduledAt.getTime() < minimumDate.getTime()) {

@@ -49,8 +49,18 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { fullName, lastName, phone, email, password, dni, licenseType, address, nationality } =
-      await req.json();
+    const {
+      fullName,
+      lastName,
+      phone,
+      email,
+      password,
+      dni,
+      documentType,
+      licenseType,
+      address,
+      nationality,
+    } = await req.json();
     if (!fullName || !lastName || !email || !password) throw new Error("Faltan datos del chofer.");
 
     // Cliente con la service role key: puede crear usuarios directamente.
@@ -65,6 +75,7 @@ Deno.serve(async (req) => {
         phone: phone ?? null,
         role: "driver",
         dni: dni ?? null,
+        document_type: documentType ?? null,
         license_type: licenseType ?? null,
         address: address ?? null,
         nationality: nationality ?? null,
@@ -72,6 +83,26 @@ Deno.serve(async (req) => {
     });
 
     if (error) throw error;
+
+    // Respaldo por si la función desplegada en el dashboard no coincide
+    // todavía con esta versión, o el trigger no llegó a correr: nos
+    // aseguramos server-side (service role, sin RLS) de que el perfil
+    // quede con el rol y los datos correctos.
+    await admin
+      .from("profiles")
+      .update({
+        role: "driver",
+        is_active: true,
+        full_name: fullName,
+        last_name: lastName,
+        phone: phone ?? null,
+        dni: dni ?? null,
+        document_type: documentType ?? null,
+        license_type: licenseType ?? null,
+        address: address ?? null,
+        nationality: nationality ?? null,
+      })
+      .eq("id", created.user.id);
 
     return new Response(JSON.stringify({ userId: created.user.id }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

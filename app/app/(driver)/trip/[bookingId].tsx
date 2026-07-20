@@ -58,6 +58,8 @@ export default function DriverTripScreen() {
   const [generalStatus, setGeneralStatus] = useState<InspectionGeneralStatus | null>(null);
   const [submittingInspection, setSubmittingInspection] = useState(false);
   const [forceShowFinish, setForceShowFinish] = useState(false);
+  const [serviceStarted, setServiceStarted] = useState(false);
+  const [forceShowInspectionStart, setForceShowInspectionStart] = useState(false);
   const [requestingReturn, setRequestingReturn] = useState(false);
   const [closingTrip, setClosingTrip] = useState(false);
 
@@ -237,7 +239,12 @@ export default function DriverTripScreen() {
     return <Text style={styles.pending}>El cliente está pagando con tarjeta/Bizum…</Text>;
   }
 
-  const needsInspection = booking.status === "accepted" && !inspection;
+  const hasArrivedPickup =
+    booking.status === "accepted" &&
+    !!myLocation &&
+    haversineDistanceKm(myLocation, { lat: booking.pickup_lat, lng: booking.pickup_lng }) <= ARRIVAL_THRESHOLD_KM;
+  const canStartInspection = booking.status === "accepted" && !inspection && !serviceStarted;
+  const needsInspection = booking.status === "accepted" && !inspection && serviceStarted;
   const waitingStartConfirmation = booking.status === "accepted" && !!inspection && !inspection.confirmed_at;
   const waitingReturnConfirmation =
     booking.status === "in_progress" && !!inspection?.return_requested_at && !inspection.return_confirmed_at;
@@ -284,6 +291,20 @@ export default function DriverTripScreen() {
         {booking.dropoff_address ? <Text style={styles.meta}>Destino: {booking.dropoff_address}</Text> : null}
         <Text style={styles.meta}>Vehículo: {booking.vehicle_info}</Text>
         <Text style={styles.price}>{formatEuros(booking.price_estimate)}</Text>
+
+        {canStartInspection ? (
+          hasArrivedPickup || forceShowInspectionStart ? (
+            <Pressable style={styles.button} onPress={() => setServiceStarted(true)}>
+              <Text style={styles.buttonText}>Iniciar servicio</Text>
+            </Pressable>
+          ) : (
+            <Pressable onPress={() => setForceShowInspectionStart(true)}>
+              <Text style={styles.arrivalHint}>
+                Esto aparece al llegar a la ubicación del cliente. ¿Ya llegaste? Tocá acá.
+              </Text>
+            </Pressable>
+          )
+        ) : null}
 
         {needsInspection ? (
           <View style={styles.inspectionBlock}>

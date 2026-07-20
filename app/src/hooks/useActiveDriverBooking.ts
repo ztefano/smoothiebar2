@@ -1,28 +1,45 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useRefreshBus } from "@/hooks/useRefreshBus";
 
-/** El viaje que el chofer tiene en curso ahora mismo (aceptado o en camino), si tiene alguno. */
+/** El viaje que el chofer tiene en curso ahora mismo (aceptado o en camino), si tiene alguno.
+ * Con tiempo real: cuando el admin le asigna un viaje nuevo, aparece solo, sin
+ * que el chofer tenga que salir y volver a entrar a la pestaña "Servicio". */
 export function useActiveDriverBooking(driverId: string | null) {
   const [bookingId, setBookingId] = useState<string | null | undefined>(undefined);
-  const [tick, setTick] = useState(0);
 
-  useRefreshBus(() => setTick((t) => t + 1));
-
-  useEffect(() => {
+  const reload = useCallback(async () => {
     if (!driverId) return;
-    supabase
+    const { data } = await supabase
       .from("bookings")
       .select("id")
       .eq("driver_id", driverId)
       .in("status", ["accepted", "in_progress"])
       .order("created_at", { ascending: false })
       .limit(1)
-      .maybeSingle()
-      .then(({ data }) => {
-        setBookingId((data?.id as string) ?? null);
-      });
-  }, [driverId, tick]);
+      .maybeSingle();
+    setBookingId((data?.id as string) ?? null);
+  }, [driverId]);
+
+  useRefreshBus(reload);
+
+  useEffect(() => {
+    if (!driverId) return;
+    reload();
+
+    const channel = supabase
+      .channel(`active-driver-booking-${driverId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "bookings", filter: `driver_id=eq.${driverId}` },
+        () => reload()
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [driverId, reload]);
 
   return bookingId; // undefined = cargando, null = sin viaje activo
 }

@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { Alert, FlatList, Pressable, StyleSheet, Switch, Text, View } from "react-native";
-import { router } from "expo-router";
 import { useAuth } from "@/state/AuthContext";
 import { usePendingBookings } from "@/hooks/useBooking";
+import { useDrivers } from "@/hooks/useDrivers";
 import { BookingCard } from "@/components/BookingCard";
+import { DriverAssignModal } from "@/components/DriverAssignModal";
 import { supabase } from "@/lib/supabase";
 import { DateTimeField } from "@/components/DateTimeField";
 import { useBookedTimes } from "@/hooks/useBookedTimes";
@@ -11,6 +12,7 @@ import { useBusinessHours } from "@/hooks/useBusinessHours";
 import { useActiveDriverCount } from "@/hooks/useActiveDriverCount";
 import { useAdminBlockedSlots } from "@/hooks/useAdminBlockedSlots";
 import { sendPushToUsers } from "@/lib/pushSend";
+import type { Booking, Profile } from "@/types";
 
 function AdminBlockPanel() {
   const [blockAt, setBlockAt] = useState(() => new Date(Date.now() + 15 * 60 * 1000));
@@ -84,7 +86,11 @@ function AdminBlockPanel() {
 
 export default function DriverRequestsScreen() {
   const { profile, refreshProfile } = useAuth();
+  const isAdmin = !!profile?.is_admin;
   const { bookings, loading } = usePendingBookings();
+  const { drivers } = useDrivers();
+  const [assigningBookingId, setAssigningBookingId] = useState<string | null>(null);
+  const [assigning, setAssigning] = useState(false);
 
   async function toggleOnline(value: boolean) {
     if (!profile) return;
@@ -99,28 +105,79 @@ export default function DriverRequestsScreen() {
     await refreshProfile();
   }
 
-  async function acceptBooking(bookingId: string) {
-    if (!profile) return;
-    const { data, error } = await supabase
-      .from("bookings")
-      .update({ status: "accepted", driver_id: profile.id })
-      .eq("id", bookingId)
-      .eq("status", "pending") // evita que dos choferes tomen el mismo viaje
-      .select("client_id")
-      .single();
+  function handleCancel(booking: Booking) {
+    Alert.alert("Cancelar reserva", "¿Seguro que querés cancelar esta reserva?", [
+      { text: "No", style: "cancel" },
+      {
+        text: "Sí, cancelar",
+        style: "destructive",
+        onPress: async () => {
+          const { error } = await supabase.from("bookings").update({ status: "cancelled" }).eq("id", booking.id);
+          if (error) {
+            Alert.alert("No se pudo cancelar", error.message);
+            return;
+          }
+          sendPushToUsers(
+            [booking.client_id],
+            "Tu reserva fue cancelada",
+            "Contactanos si tenés dudas sobre tu viaje."
+          );
+        },
+      },
+    ]);
+  }
 
-    if (error) {
-      Alert.alert("No se pudo aceptar", error.message);
-      return;
-    }
-    if (data?.client_id) {
+  async function handleAssign(driver: Profile) {
+    if (!assigningBookingId) return;
+    setAssigning(true);
+    try {
+      const { data, error } = await supabase
+        .from("bookings")
+        .update({ status: "accepted", driver_id: driver.id })
+        .eq("id", assigningBookingId)
+        .eq("status", "pending") // evita asignar dos veces la misma reserva
+        .select("client_id")
+        .single();
+
+      if (error) throw error;
+
+      if (data?.client_id) {
+        sendPushToUsers(
+          [data.client_id as string],
+          "¡Tu chofer está en camino!",
+          `${driver.full_name} fue asignado a tu viaje.`
+        );
+      }
       sendPushToUsers(
-        [data.client_id as string],
-        "¡Tu chofer está en camino!",
-        `${profile.full_name} aceptó tu viaje.`
+        [driver.id],
+        "Nuevo servicio asignado",
+        "Tenés un viaje nuevo asignado. Revisalo en Servicio."
       );
+      setAssigningBookingId(null);
+    } catch (err) {
+      Alert.alert("No se pudo asignar", (err as Error).message);
+    } finally {
+      setAssigning(false);
     }
-    router.push(`/(driver)/trip/${bookingId}`);
+  }
+
+  if (!isAdmin) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.onlineRow}>
+          <Text style={styles.onlineLabel}>
+            {profile?.is_online ? "Estás disponible" : "Estás desconectado"}
+          </Text>
+          <Switch value={profile?.is_online ?? false} onValueChange={toggleOnline} />
+        </View>
+        <View style={styles.empty}>
+          <Text style={styles.emptyTitle}>Los viajes los asigna el administrador</Text>
+          <Text style={styles.emptySubtitle}>
+            Cuando te asignen un servicio, te va a llegar una notificación y lo vas a ver en "Servicio".
+          </Text>
+        </View>
+      </View>
+    );
   }
 
   return (
@@ -137,16 +194,40 @@ export default function DriverRequestsScreen() {
         data={bookings}
         keyExtractor={(item) => item.id}
         refreshing={loading}
-        ListHeaderComponent={profile?.is_admin ? <AdminBlockPanel /> : null}
+        ListHeaderComponent={<AdminBlockPanel />}
         ListEmptyComponent={
           <View style={styles.empty}>
             <Text>No hay solicitudes pendientes por ahora.</Text>
           </View>
         }
         renderItem={({ item }) => (
-          <BookingCard booking={item} actionLabel="Aceptar viaje" onPress={() => acceptBooking(item.id)} />
+          <View style={styles.cardWrapper}>
+            <BookingCard booking={item} />
+            <View style={styles.actionsRow}>
+              <Pressable
+                style={[styles.actionButton, styles.acceptButton]}
+                onPress={() => setAssigningBookingId(item.id)}
+              >
+                <Text style={styles.actionButtonText}>Aceptar reserva</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.actionButton, styles.cancelButton]}
+                onPress={() => handleCancel(item)}
+              >
+                <Text style={styles.actionButtonText}>Cancelar</Text>
+              </Pressable>
+            </View>
+          </View>
         )}
         ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
+      />
+
+      <DriverAssignModal
+        visible={!!assigningBookingId}
+        drivers={drivers}
+        assigning={assigning}
+        onSelect={handleAssign}
+        onClose={() => setAssigningBookingId(null)}
       />
     </View>
   );
@@ -165,7 +246,15 @@ const styles = StyleSheet.create({
   },
   onlineLabel: { fontSize: 15, fontWeight: "600", color: "#111827" },
   list: { padding: 16, flexGrow: 1 },
-  empty: { flex: 1, alignItems: "center", justifyContent: "center", paddingTop: 60 },
+  empty: { flex: 1, alignItems: "center", justifyContent: "center", paddingTop: 60, gap: 8, paddingHorizontal: 24 },
+  emptyTitle: { fontSize: 16, fontWeight: "800", color: "#111827", textAlign: "center" },
+  emptySubtitle: { fontSize: 13, color: "#6B7280", textAlign: "center" },
+  cardWrapper: { gap: 8 },
+  actionsRow: { flexDirection: "row", gap: 8 },
+  actionButton: { flex: 1, borderRadius: 10, paddingVertical: 12, alignItems: "center" },
+  acceptButton: { backgroundColor: "#16A34A" },
+  cancelButton: { backgroundColor: "#DC2626" },
+  actionButtonText: { color: "white", fontWeight: "700", fontSize: 14 },
   blockPanel: {
     backgroundColor: "white",
     borderRadius: 12,

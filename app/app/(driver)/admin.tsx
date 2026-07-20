@@ -13,6 +13,7 @@ import {
 } from "react-native";
 import { useAuth } from "@/state/AuthContext";
 import { supabase } from "@/lib/supabase";
+import { useDrivers } from "@/hooks/useDrivers";
 import { SelectModal } from "@/components/SelectModal";
 import { NATIONALITIES } from "@/lib/countries";
 import { DOCUMENT_TYPES, LICENSE_TYPES } from "@/lib/licenseTypes";
@@ -50,17 +51,8 @@ export default function AdminScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [drivers, setDrivers] = useState<Profile[]>([]);
+  const { drivers, reload: loadDrivers } = useDrivers();
   const [togglingId, setTogglingId] = useState<string | null>(null);
-
-  const loadDrivers = useCallback(async () => {
-    const { data } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("role", "driver")
-      .order("created_at", { ascending: false });
-    setDrivers((data ?? []) as Profile[]);
-  }, []);
 
   useFocusEffect(
     useCallback(() => {
@@ -119,11 +111,11 @@ export default function AdminScreen() {
 
   async function toggleActive(driver: Profile, value: boolean) {
     setTogglingId(driver.id);
-    setDrivers((prev) => prev.map((d) => (d.id === driver.id ? { ...d, is_active: value } : d)));
     const { error } = await supabase.from("profiles").update({ is_active: value }).eq("id", driver.id);
     if (error) {
-      setDrivers((prev) => prev.map((d) => (d.id === driver.id ? { ...d, is_active: !value } : d)));
       Alert.alert("No se pudo actualizar", error.message);
+    } else {
+      await loadDrivers();
     }
     setTogglingId(null);
   }

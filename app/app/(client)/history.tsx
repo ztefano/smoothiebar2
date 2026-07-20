@@ -45,6 +45,22 @@ export default function ClientHistoryScreen() {
     }, [load])
   );
 
+  useEffect(() => {
+    if (!profile) return;
+    const channel = supabase
+      .channel(`client-history-${profile.id}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "bookings", filter: `client_id=eq.${profile.id}` },
+        () => load()
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [profile, load]);
+
   const activeBooking = bookings.find((b) => ACTIVE_STATUSES.includes(b.status)) ?? null;
   const pastBookings = bookings.filter((b) => b.id !== activeBooking?.id);
 

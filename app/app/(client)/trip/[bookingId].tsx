@@ -156,8 +156,15 @@ export default function ClientTripScreen() {
       {showMap ? (
         <LiveTrackingMap target={target} targetLabel={targetLabel} driverLocation={driverLocation} />
       ) : (
-        <View style={styles.center}>
-          <ActivityIndicator />
+        <View style={styles.placeholder}>
+          <Text style={styles.placeholderEmoji}>{booking.status === "cancelled" ? "❌" : "🚗"}</Text>
+          <Text style={styles.placeholderText}>
+            {booking.status === "completed"
+              ? "Viaje completado."
+              : booking.status === "cancelled"
+              ? "Este viaje fue cancelado."
+              : "Tu reserva está registrada. Cuando te asignen un chofer, vas a ver el mapa en vivo acá."}
+          </Text>
         </View>
       )}
 
@@ -177,6 +184,9 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   reviewScreen: { flex: 1, backgroundColor: "white" },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
+  placeholder: { flex: 1, alignItems: "center", justifyContent: "center", padding: 32, gap: 12, backgroundColor: "#F9FAFB" },
+  placeholderEmoji: { fontSize: 44 },
+  placeholderText: { fontSize: 15, color: "#6B7280", textAlign: "center", lineHeight: 22 },
   footerScroll: { maxHeight: 220, backgroundColor: "white" },
   footer: { padding: 20, gap: 6 },
   statusText: { fontSize: 16, fontWeight: "700", color: "#111827" },

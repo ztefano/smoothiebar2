@@ -1,5 +1,7 @@
+import { useEffect, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import MapView, { Marker, Polyline } from "react-native-maps";
+import * as Location from "expo-location";
 import type { Coordinates } from "@/types";
 import { useDirectionsEta } from "@/hooks/useDirectionsEta";
 
@@ -22,6 +24,31 @@ export function LiveTrackingMap({
 }: LiveTrackingMapProps) {
   const eta = useDirectionsEta(target, driverLocation);
 
+  // El punto azul nativo (showsUserLocation) SOLO se puede activar cuando el
+  // permiso de ubicación ya está concedido. Activarlo antes hace que Android
+  // lance una excepción de seguridad y la app se cierre por completo. Por eso
+  // esperamos a confirmar el permiso antes de habilitarlo.
+  const [locationGranted, setLocationGranted] = useState(false);
+
+  useEffect(() => {
+    if (!showsOwnLocation) return;
+    let cancelled = false;
+    (async () => {
+      const current = await Location.getForegroundPermissionsAsync();
+      let granted = current.status === "granted";
+      if (!granted && current.canAskAgain) {
+        const asked = await Location.requestForegroundPermissionsAsync();
+        granted = asked.status === "granted";
+      }
+      if (!cancelled) setLocationGranted(granted);
+    })().catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [showsOwnLocation]);
+
+  const showBlueDot = !!showsOwnLocation && locationGranted;
+
   const initialRegion = {
     latitude: driverLocation?.lat ?? target.lat,
     longitude: driverLocation?.lng ?? target.lng,
@@ -34,8 +61,8 @@ export function LiveTrackingMap({
       <MapView
         style={styles.map}
         initialRegion={initialRegion}
-        showsUserLocation={showsOwnLocation}
-        followsUserLocation={showsOwnLocation}
+        showsUserLocation={showBlueDot}
+        followsUserLocation={showBlueDot}
         showsMyLocationButton={false}
       >
         <Marker

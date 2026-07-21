@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useRefreshBus } from "@/hooks/useRefreshBus";
+import { uniqueChannelName } from "@/lib/realtime";
 import type { Booking, BookingStatus } from "@/types";
 
 export function useBooking(bookingId: string | null) {
@@ -26,7 +27,7 @@ export function useBooking(bookingId: string | null) {
     reload();
 
     const channel = supabase
-      .channel(`booking-${bookingId}`)
+      .channel(uniqueChannelName(`booking-${bookingId}`))
       .on(
         "postgres_changes",
         {
@@ -77,7 +78,7 @@ export function usePendingBookings() {
     reload();
 
     const channel = supabase
-      .channel("pending-bookings")
+      .channel(uniqueChannelName("pending-bookings"))
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "bookings" },
@@ -113,7 +114,7 @@ export function useAllBookings() {
   useEffect(() => {
     reload();
     const channel = supabase
-      .channel("all-bookings")
+      .channel(uniqueChannelName("all-bookings"))
       .on("postgres_changes", { event: "*", schema: "public", table: "bookings" }, () => reload())
       .subscribe();
     return () => {
@@ -147,7 +148,7 @@ export function useDriverBookings(driverId: string | null) {
     if (!driverId) return;
     reload();
     const channel = supabase
-      .channel(`driver-bookings-${driverId}`)
+      .channel(uniqueChannelName(`driver-bookings-${driverId}`))
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "bookings", filter: `driver_id=eq.${driverId}` },

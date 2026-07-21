@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { uniqueChannelName } from "@/lib/realtime";
 import type { Coordinates } from "@/types";
 
 /** Se suscribe en tiempo real a la posición del chofer para una reserva. */
@@ -19,7 +20,7 @@ export function useDriverLocation(bookingId: string | null): Coordinates | null 
       });
 
     const channel = supabase
-      .channel(`driver-location-${bookingId}`)
+      .channel(uniqueChannelName(`driver-location-${bookingId}`))
       .on(
         "postgres_changes",
         {

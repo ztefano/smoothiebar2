@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useRefreshBus } from "@/hooks/useRefreshBus";
+import { uniqueChannelName } from "@/lib/realtime";
 
 /** El viaje que el chofer tiene en curso ahora mismo (aceptado o en camino), si tiene alguno.
  * Con tiempo real: cuando el admin le asigna un viaje nuevo, aparece solo, sin
@@ -28,7 +29,7 @@ export function useActiveDriverBooking(driverId: string | null) {
     reload();
 
     const channel = supabase
-      .channel(`active-driver-booking-${driverId}`)
+      .channel(uniqueChannelName(`active-driver-booking-${driverId}`))
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "bookings", filter: `driver_id=eq.${driverId}` },

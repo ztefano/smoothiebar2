@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useRefreshBus } from "@/hooks/useRefreshBus";
+import { uniqueChannelName } from "@/lib/realtime";
 import type { Booking } from "@/types";
 
 const ACTIVE_STATUSES: Booking["status"][] = ["pending", "accepted", "in_progress"];
@@ -30,7 +31,7 @@ export function useActiveClientBooking(clientId: string | null) {
     reload();
 
     const channel = supabase
-      .channel(`active-client-booking-${clientId}`)
+      .channel(uniqueChannelName(`active-client-booking-${clientId}`))
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "bookings", filter: `client_id=eq.${clientId}` },

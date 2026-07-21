@@ -3,6 +3,7 @@ import { useFocusEffect, useRouter } from "expo-router";
 import { FlatList, Image, RefreshControl, StyleSheet, Text, View } from "react-native";
 import { useAuth } from "@/state/AuthContext";
 import { supabase } from "@/lib/supabase";
+import { uniqueChannelName } from "@/lib/realtime";
 import { BookingCard } from "@/components/BookingCard";
 import type { Booking } from "@/types";
 
@@ -48,7 +49,7 @@ export default function ClientHistoryScreen() {
   useEffect(() => {
     if (!profile) return;
     const channel = supabase
-      .channel(`client-history-${profile.id}`)
+      .channel(uniqueChannelName(`client-history-${profile.id}`))
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "bookings", filter: `client_id=eq.${profile.id}` },

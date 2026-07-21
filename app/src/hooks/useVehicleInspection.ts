@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useRefreshBus } from "@/hooks/useRefreshBus";
+import { uniqueChannelName } from "@/lib/realtime";
 import type {
   ConfirmationMethod,
   DamageEntry,
@@ -35,7 +36,7 @@ export function useVehicleInspection(bookingId: string | null) {
     reload();
 
     const channel = supabase
-      .channel(`inspection-${bookingId}`)
+      .channel(uniqueChannelName(`inspection-${bookingId}`))
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "vehicle_inspections", filter: `booking_id=eq.${bookingId}` },

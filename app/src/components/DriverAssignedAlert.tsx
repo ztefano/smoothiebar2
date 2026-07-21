@@ -1,38 +1,44 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import { router } from "expo-router";
 import { useActiveClientBooking } from "@/hooks/useActiveClientBooking";
-import type { BookingStatus } from "@/types";
 
 interface DriverAssignedAlertProps {
   clientId: string | null;
 }
 
-/** Ventana flotante a pantalla completa que aparece apenas el admin le
- * asigna un chofer al cliente, en cualquier pestaña, sin depender de que
- * abra la notificación push. */
+const acknowledged = new Set<string>();
+
+/** Ventana flotante a pantalla completa que aparece cuando al cliente le
+ * asignaron un chofer (viaje en estado accepted) — al asignárselo en vivo o
+ * al abrir la app —, sin depender de la notificación push. */
 export function DriverAssignedAlert({ clientId }: DriverAssignedAlertProps) {
   const booking = useActiveClientBooking(clientId);
-  const [visible, setVisible] = useState(false);
-  const hasLoadedOnce = useRef(false);
-  const prevStatus = useRef<BookingStatus | null | undefined>(undefined);
-  const [bookingId, setBookingId] = useState<string | null>(null);
+  const [dismissed, setDismissed] = useState<string | null>(null);
 
   useEffect(() => {
-    if (booking === undefined) return;
-    const prev = prevStatus.current;
-    if (hasLoadedOnce.current && booking?.status === "accepted" && prev !== "accepted") {
-      setBookingId(booking.id);
-      setVisible(true);
+    if (booking && booking.status === "accepted" && !acknowledged.has(booking.id)) {
+      setDismissed(null);
     }
-    hasLoadedOnce.current = true;
-    prevStatus.current = booking?.status ?? null;
-  }, [booking]);
+  }, [booking?.id, booking?.status]);
 
-  if (!visible || !bookingId) return null;
+  const visible =
+    !!booking &&
+    booking.status === "accepted" &&
+    !acknowledged.has(booking.id) &&
+    dismissed !== booking.id;
+
+  function close() {
+    if (booking) {
+      acknowledged.add(booking.id);
+      setDismissed(booking.id);
+    }
+  }
+
+  if (!visible || !booking) return null;
 
   return (
-    <Modal visible transparent animationType="slide" onRequestClose={() => setVisible(false)}>
+    <Modal visible transparent animationType="slide" onRequestClose={close}>
       <View style={styles.backdrop}>
         <View style={styles.card}>
           <Text style={styles.emoji}>🚘</Text>
@@ -41,11 +47,15 @@ export function DriverAssignedAlert({ clientId }: DriverAssignedAlertProps) {
           <Pressable
             style={styles.button}
             onPress={() => {
-              setVisible(false);
-              router.push(`/(client)/trip/${bookingId}`);
+              const id = booking.id;
+              close();
+              router.push(`/(client)/trip/${id}`);
             }}
           >
             <Text style={styles.buttonText}>Ver viaje</Text>
+          </Pressable>
+          <Pressable style={styles.laterButton} onPress={close}>
+            <Text style={styles.laterText}>Más tarde</Text>
           </Pressable>
         </View>
       </View>
@@ -74,4 +84,6 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   buttonText: { color: "white", fontWeight: "800", fontSize: 16 },
+  laterButton: { paddingVertical: 10 },
+  laterText: { color: "#6B7280", fontWeight: "600", fontSize: 14 },
 });

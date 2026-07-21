@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { useFocusEffect, useRouter } from "expo-router";
-import { FlatList, Image, RefreshControl, StyleSheet, Text, View } from "react-native";
+import { Alert, FlatList, Image, Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
 import { useAuth } from "@/state/AuthContext";
 import { supabase } from "@/lib/supabase";
 import { uniqueChannelName } from "@/lib/realtime";
 import { BookingCard } from "@/components/BookingCard";
+import { Checkbox, PencilToggle, TrashFab } from "@/components/SelectionUI";
 import type { Booking } from "@/types";
 
 interface DriverInfo {
@@ -62,8 +63,45 @@ export default function ClientHistoryScreen() {
     };
   }, [profile, load]);
 
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+
   const activeBooking = bookings.find((b) => ACTIVE_STATUSES.includes(b.status)) ?? null;
   const pastBookings = bookings.filter((b) => b.id !== activeBooking?.id);
+
+  function toggleSelected(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function exitSelection() {
+    setSelectionMode(false);
+    setSelected(new Set());
+  }
+
+  function handleDeleteSelected() {
+    const ids = [...selected];
+    Alert.alert("Eliminar del historial", `¿Borrar ${ids.length} viaje(s)? Esta acción no se puede deshacer.`, [
+      { text: "Cancelar", style: "cancel" },
+      {
+        text: "Eliminar",
+        style: "destructive",
+        onPress: async () => {
+          const { error } = await supabase.from("bookings").delete().in("id", ids);
+          if (error) {
+            Alert.alert("No se pudo eliminar", `${error.message}. ¿Corriste la migración 0020 en Supabase?`);
+          } else {
+            exitSelection();
+            await load();
+          }
+        },
+      },
+    ]);
+  }
 
   useEffect(() => {
     if (!activeBooking?.driver_id) {
@@ -79,6 +117,7 @@ export default function ClientHistoryScreen() {
   }, [activeBooking?.driver_id]);
 
   return (
+    <View style={{ flex: 1 }}>
     <FlatList
       contentContainerStyle={styles.list}
       data={pastBookings}
@@ -132,7 +171,23 @@ export default function ClientHistoryScreen() {
               />
             </View>
 
-            {pastBookings.length > 0 ? <Text style={styles.sectionTitle}>Viajes anteriores</Text> : null}
+            {pastBookings.length > 0 ? (
+              <View style={styles.pastHeader}>
+                <Text style={styles.sectionTitle}>Viajes anteriores</Text>
+                <PencilToggle
+                  active={selectionMode}
+                  onPress={() => (selectionMode ? exitSelection() : setSelectionMode(true))}
+                />
+              </View>
+            ) : null}
+          </View>
+        ) : pastBookings.length > 0 ? (
+          <View style={styles.pastHeaderTop}>
+            <Text style={styles.sectionTitle}>Historial</Text>
+            <PencilToggle
+              active={selectionMode}
+              onPress={() => (selectionMode ? exitSelection() : setSelectionMode(true))}
+            />
           </View>
         ) : null
       }
@@ -143,15 +198,26 @@ export default function ClientHistoryScreen() {
           </View>
         ) : null
       }
-      renderItem={({ item }) => (
-        <BookingCard
-          booking={item}
-          actionLabel="Ver viaje"
-          onPress={() => router.push(`/(client)/trip/${item.id}`)}
-        />
-      )}
+      renderItem={({ item }) =>
+        selectionMode ? (
+          <Pressable style={styles.selectRow} onPress={() => toggleSelected(item.id)}>
+            <Checkbox checked={selected.has(item.id)} />
+            <View style={{ flex: 1 }}>
+              <BookingCard booking={item} />
+            </View>
+          </Pressable>
+        ) : (
+          <BookingCard
+            booking={item}
+            actionLabel="Ver viaje"
+            onPress={() => router.push(`/(client)/trip/${item.id}`)}
+          />
+        )
+      }
       ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
     />
+    <TrashFab count={selected.size} onPress={handleDeleteSelected} />
+    </View>
   );
 }
 
@@ -183,4 +249,7 @@ const styles = StyleSheet.create({
   driverMeta: { fontSize: 13, color: "#6B7280", marginTop: 2 },
   hint: { fontSize: 13, color: "#2563EB", fontWeight: "600" },
   sectionTitle: { fontSize: 14, fontWeight: "700", color: "#6B7280", marginTop: 4 },
+  pastHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 4 },
+  pastHeaderTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 },
+  selectRow: { flexDirection: "row", alignItems: "center", gap: 12 },
 });

@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase";
 import { useDrivers } from "@/hooks/useDrivers";
 import { SheetModal } from "@/components/SheetModal";
 import { DriverFormModal } from "@/components/DriverFormModal";
+import { Checkbox, PencilToggle, TrashFab } from "@/components/SelectionUI";
 import type { Profile } from "@/types";
 
 async function extractFunctionErrorMessage(error: unknown): Promise<string> {
@@ -29,12 +30,54 @@ export default function AdminScreen() {
   const [editDriver, setEditDriver] = useState<Profile | null>(null);
   const [detailDriver, setDetailDriver] = useState<Profile | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
 
   useFocusEffect(
     useCallback(() => {
       loadDrivers();
     }, [loadDrivers])
   );
+
+  function toggleSelected(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function exitSelection() {
+    setSelectionMode(false);
+    setSelected(new Set());
+  }
+
+  function handleDeleteSelected() {
+    const ids = [...selected];
+    Alert.alert("Eliminar choferes", `¿Eliminar ${ids.length} chofer(es)? Esta acción no se puede deshacer.`, [
+      { text: "Cancelar", style: "cancel" },
+      {
+        text: "Eliminar",
+        style: "destructive",
+        onPress: async () => {
+          for (const id of ids) {
+            try {
+              const { data, error } = await supabase.functions.invoke("delete-driver-account", {
+                body: { driverId: id },
+              });
+              if (error) throw new Error(await extractFunctionErrorMessage(error));
+              if ((data as { error?: string } | null)?.error) throw new Error((data as { error: string }).error);
+            } catch (err) {
+              Alert.alert("No se pudo eliminar uno", (err as Error).message);
+            }
+          }
+          exitSelection();
+          await loadDrivers();
+        },
+      },
+    ]);
+  }
 
   if (!profile?.is_admin) {
     return <Redirect href="/(driver)/requests" />;
@@ -78,41 +121,66 @@ export default function AdminScreen() {
         contentContainerStyle={styles.list}
         data={drivers}
         keyExtractor={(item) => item.id}
-        ListHeaderComponent={<Text style={styles.title}>Choferes ({drivers.length})</Text>}
-        ListEmptyComponent={<Text style={styles.empty}>Todavía no creaste ningún chofer.</Text>}
-        renderItem={({ item }) => (
-          <View style={styles.card}>
-            <View style={styles.cardHeader}>
-              <Text style={styles.driverName}>
-                {item.full_name} {item.last_name}
-              </Text>
-              <Switch
-                value={item.is_active}
-                onValueChange={(value) => toggleActive(item, value)}
-                disabled={togglingId === item.id}
-              />
-            </View>
-            <Text style={styles.driverMeta}>{item.phone ?? "Sin teléfono"}</Text>
-            <View style={styles.statusRow}>
-              <Text style={[styles.status, item.is_active ? styles.active : styles.inactive]}>
-                {item.is_active ? "Activo" : "Inactivo"}
-              </Text>
-              <Text style={[styles.status, item.is_online ? styles.online : styles.offline]}>
-                {item.is_online ? "Disponible" : "Desconectado"}
-              </Text>
-            </View>
-            <Pressable style={styles.detailButton} onPress={() => setDetailDriver(item)}>
-              <Text style={styles.detailButtonText}>Ver detalle</Text>
-            </Pressable>
+        ListHeaderComponent={
+          <View style={styles.listHeader}>
+            <Text style={styles.title}>Choferes ({drivers.length})</Text>
+            <PencilToggle
+              active={selectionMode}
+              onPress={() => (selectionMode ? exitSelection() : setSelectionMode(true))}
+            />
           </View>
-        )}
+        }
+        ListEmptyComponent={<Text style={styles.empty}>Todavía no creaste ningún chofer.</Text>}
+        renderItem={({ item }) => {
+          const isSelected = selected.has(item.id);
+          return (
+            <Pressable
+              style={styles.card}
+              onPress={() => (selectionMode ? toggleSelected(item.id) : setDetailDriver(item))}
+            >
+              <View style={styles.cardHeader}>
+                <View style={styles.nameRow}>
+                  {selectionMode ? <Checkbox checked={isSelected} /> : null}
+                  <Text style={styles.driverName}>
+                    {item.full_name} {item.last_name}
+                  </Text>
+                </View>
+                {!selectionMode ? (
+                  <Switch
+                    value={item.is_active}
+                    onValueChange={(value) => toggleActive(item, value)}
+                    disabled={togglingId === item.id}
+                  />
+                ) : null}
+              </View>
+              <Text style={styles.driverMeta}>{item.phone ?? "Sin teléfono"}</Text>
+              <View style={styles.statusRow}>
+                <Text style={[styles.status, item.is_active ? styles.active : styles.inactive]}>
+                  {item.is_active ? "Activo" : "Inactivo"}
+                </Text>
+                <Text style={[styles.status, item.is_online ? styles.online : styles.offline]}>
+                  {item.is_online ? "Disponible" : "Desconectado"}
+                </Text>
+              </View>
+              {!selectionMode ? (
+                <View style={styles.detailButton}>
+                  <Text style={styles.detailButtonText}>Ver detalle</Text>
+                </View>
+              ) : null}
+            </Pressable>
+          );
+        }}
         ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
         ListFooterComponent={
-          <Pressable style={styles.addButton} onPress={() => setShowForm(true)}>
-            <Text style={styles.addButtonText}>+ Agregar chofer</Text>
-          </Pressable>
+          !selectionMode ? (
+            <Pressable style={styles.addButton} onPress={() => setShowForm(true)}>
+              <Text style={styles.addButtonText}>+ Agregar chofer</Text>
+            </Pressable>
+          ) : null
         }
       />
+
+      <TrashFab count={selected.size} onPress={handleDeleteSelected} />
 
       {/* Alta de chofer */}
       <DriverFormModal
@@ -193,7 +261,9 @@ function DetailRow({ label, value }: { label: string; value: string }) {
 
 const styles = StyleSheet.create({
   list: { padding: 20, gap: 10, flexGrow: 1 },
-  title: { fontSize: 20, fontWeight: "800", color: "#111827", marginBottom: 6 },
+  listHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 6 },
+  title: { fontSize: 20, fontWeight: "800", color: "#111827" },
+  nameRow: { flexDirection: "row", alignItems: "center", gap: 10, flex: 1 },
   empty: { textAlign: "center", color: "#6B7280", marginTop: 8 },
   card: {
     backgroundColor: "white",

@@ -128,11 +128,11 @@ function AdminRequests() {
         .from("bookings")
         .update({ status: "accepted", driver_id: driver.id })
         .eq("id", assigningBookingId)
-        .eq("status", "pending")
+        .in("status", ["pending", "accepted"]) // se puede asignar o reasignar, no tocar canceladas/finalizadas
         .select("client_id")
         .maybeSingle();
       if (error) throw error;
-      if (!data) throw new Error("La reserva ya no está pendiente, o falta correr la migración 0016 en Supabase.");
+      if (!data) throw new Error("Esa reserva ya no se puede (re)asignar, o falta correr la migración 0016 en Supabase.");
       if (data.client_id) {
         sendPushToUsers([data.client_id as string], "Se te ha asignado un chofer", `${driver.full_name} ya está en camino.`, {
           bookingId: assigningBookingId,
@@ -194,6 +194,14 @@ function AdminRequests() {
                     <Text style={styles.actionButtonText}>Cancelar</Text>
                   </Pressable>
                 </>
+              ) : null}
+              {item.status === "accepted" ? (
+                <Pressable
+                  style={[styles.actionButton, styles.changeButton]}
+                  onPress={() => setAssigningBookingId(item.id)}
+                >
+                  <Text style={styles.actionButtonText}>Cambiar chofer</Text>
+                </Pressable>
               ) : null}
               <Pressable style={[styles.actionButton, styles.detailButton]} onPress={() => setDetail(item)}>
                 <Text style={styles.detailButtonText}>Ver detalle</Text>
@@ -322,6 +330,7 @@ const styles = StyleSheet.create({
   actionButton: { flex: 1, borderRadius: 10, paddingVertical: 12, alignItems: "center" },
   acceptButton: { backgroundColor: "#16A34A" },
   cancelButton: { backgroundColor: "#DC2626" },
+  changeButton: { backgroundColor: "#D97706" },
   detailButton: { borderWidth: 1, borderColor: "#E5E7EB", backgroundColor: "white" },
   actionButtonText: { color: "white", fontWeight: "700", fontSize: 14 },
   detailButtonText: { color: "#2563EB", fontWeight: "700", fontSize: 14 },

@@ -59,7 +59,6 @@ export default function DriverTripScreen() {
   const [submittingInspection, setSubmittingInspection] = useState(false);
   const [forceShowFinish, setForceShowFinish] = useState(false);
   const [serviceStarted, setServiceStarted] = useState(false);
-  const [forceShowInspectionStart, setForceShowInspectionStart] = useState(false);
   const [requestingReturn, setRequestingReturn] = useState(false);
   const [closingTrip, setClosingTrip] = useState(false);
 
@@ -108,6 +107,21 @@ export default function DriverTripScreen() {
       "Tu chofer llegó",
       `${profile?.full_name ?? "Tu chofer"} está en el punto de encuentro.`,
       { bookingId: booking!.id }
+    );
+  }
+
+  function handleStartServicePress() {
+    if (hasArrivedPickup) {
+      handleStartService();
+      return;
+    }
+    Alert.alert(
+      "¿Ya estás con el cliente?",
+      "Todavía no detectamos que estés en la ubicación del cliente. El servicio se inicia cuando llegás, para revisar el vehículo. ¿Iniciar igual?",
+      [
+        { text: "Todavía no", style: "cancel" },
+        { text: "Iniciar servicio", onPress: handleStartService },
+      ]
     );
   }
 
@@ -305,17 +319,15 @@ export default function DriverTripScreen() {
         <Text style={styles.price}>{formatEuros(booking.price_estimate)}</Text>
 
         {canStartInspection ? (
-          hasArrivedPickup || forceShowInspectionStart ? (
-            <Pressable style={styles.button} onPress={handleStartService}>
+          <View style={styles.inspectionBlock}>
+            <Text style={styles.inspectionTitle}>Servicio asignado</Text>
+            <Text style={styles.meta}>
+              Cuando estés en la ubicación del cliente, iniciá el servicio para cargar la revisión del vehículo.
+            </Text>
+            <Pressable style={styles.button} onPress={handleStartServicePress}>
               <Text style={styles.buttonText}>Iniciar servicio</Text>
             </Pressable>
-          ) : (
-            <Pressable onPress={() => setForceShowInspectionStart(true)}>
-              <Text style={styles.arrivalHint}>
-                Esto aparece al llegar a la ubicación del cliente. ¿Ya llegaste? Tocá acá.
-              </Text>
-            </Pressable>
-          )
+          </View>
         ) : null}
 
         {needsInspection ? (

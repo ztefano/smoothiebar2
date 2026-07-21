@@ -4,7 +4,6 @@ import {
   ActivityIndicator,
   Alert,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -23,10 +22,13 @@ export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [history, setHistory] = useState<string[]>([]);
+  const [emailFocused, setEmailFocused] = useState(false);
 
   useEffect(() => {
     getLoginHistory().then(setHistory);
   }, []);
+
+  const suggestions = history.filter((h) => h.includes(email.trim().toLowerCase()));
 
   async function handleLogin() {
     setLoading(true);
@@ -100,29 +102,39 @@ export default function LoginScreen() {
         </Pressable>
       </View>
 
-      <TextInput
-        style={styles.input}
-        placeholder="Correo electrónico"
-        autoCapitalize="none"
-        keyboardType="email-address"
-        value={email}
-        onChangeText={setEmail}
-      />
+      <View>
+        <TextInput
+          style={styles.input}
+          placeholder="Correo electrónico"
+          autoCapitalize="none"
+          keyboardType="email-address"
+          value={email}
+          onChangeText={setEmail}
+          onFocus={() => setEmailFocused(true)}
+          onBlur={() => setTimeout(() => setEmailFocused(false), 150)}
+        />
 
-      {history.length > 0 ? (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
-          {history.map((h) => (
-            <View key={h} style={styles.chip}>
-              <Pressable onPress={() => setEmail(h)} hitSlop={6}>
-                <Text style={styles.chipText}>{h}</Text>
-              </Pressable>
-              <Pressable onPress={() => removeLoginHistory(h).then(setHistory)} hitSlop={6}>
-                <Text style={styles.chipRemove}>✕</Text>
-              </Pressable>
-            </View>
-          ))}
-        </ScrollView>
-      ) : null}
+        {emailFocused && suggestions.length > 0 ? (
+          <View style={styles.dropdown}>
+            {suggestions.map((h) => (
+              <View key={h} style={styles.dropdownRow}>
+                <Pressable
+                  style={styles.dropdownPick}
+                  onPress={() => {
+                    setEmail(h);
+                    setEmailFocused(false);
+                  }}
+                >
+                  <Text style={styles.dropdownText}>{h}</Text>
+                </Pressable>
+                <Pressable onPress={() => removeLoginHistory(h).then(setHistory)} hitSlop={8}>
+                  <Text style={styles.dropdownRemove}>✕</Text>
+                </Pressable>
+              </View>
+            ))}
+          </View>
+        ) : null}
+      </View>
 
       <TextInput
         style={styles.input}
@@ -189,18 +201,23 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     fontSize: 15,
   },
-  chipRow: { gap: 8, paddingVertical: 2 },
-  chip: {
+  dropdown: {
+    marginTop: 4,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    borderRadius: 10,
+    backgroundColor: "white",
+    overflow: "hidden",
+  },
+  dropdownRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
-    backgroundColor: "#F3F4F6",
-    borderRadius: 16,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F3F4F6",
   },
-  chipText: { fontSize: 12, color: "#374151", fontWeight: "600" },
-  chipRemove: { fontSize: 12, color: "#9CA3AF", fontWeight: "700" },
+  dropdownPick: { flex: 1, paddingVertical: 12, paddingHorizontal: 14 },
+  dropdownText: { fontSize: 14, color: "#111827", fontWeight: "600" },
+  dropdownRemove: { fontSize: 14, color: "#9CA3AF", fontWeight: "700", paddingHorizontal: 14 },
   button: {
     backgroundColor: "#111827",
     borderRadius: 10,

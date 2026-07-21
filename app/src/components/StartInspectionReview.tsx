@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { DamageSummaryList } from "@/components/DamageSummaryList";
 import { useCurrentLocation } from "@/hooks/useLocation";
 import type { VehicleInspection } from "@/types";
@@ -29,6 +29,11 @@ export function StartInspectionReview({ inspection, defaultName, onConfirm }: St
     setSubmitting(true);
     try {
       await onConfirm({ name: name.trim(), lat: location?.lat ?? null, lng: location?.lng ?? null });
+    } catch (err) {
+      Alert.alert(
+        "No se pudo confirmar",
+        `${(err as Error).message}. Si menciona columnas o permisos, falta correr la migración 0014 en Supabase.`
+      );
     } finally {
       setSubmitting(false);
     }

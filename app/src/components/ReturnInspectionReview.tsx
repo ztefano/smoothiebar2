@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { CarDamageDiagram } from "@/components/CarDamageDiagram";
 import { useCurrentLocation } from "@/hooks/useLocation";
 import type { DamageEntry, ReturnStatus } from "@/types";
@@ -42,6 +42,11 @@ export function ReturnInspectionReview({ bookingId, defaultName, onConfirm }: Re
         lat: location?.lat ?? null,
         lng: location?.lng ?? null,
       });
+    } catch (err) {
+      Alert.alert(
+        "No se pudo confirmar",
+        `${(err as Error).message}. Si menciona columnas o permisos, falta correr la migración 0014 en Supabase.`
+      );
     } finally {
       setSubmitting(false);
     }

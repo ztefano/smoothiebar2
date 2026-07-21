@@ -78,7 +78,7 @@ export function useVehicleInspection(bookingId: string | null) {
     lng: number | null;
   }) {
     if (!bookingId) return;
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from("vehicle_inspections")
       .update({
         client_confirmation_name: params.name,
@@ -87,8 +87,12 @@ export function useVehicleInspection(bookingId: string | null) {
         start_lat: params.lat,
         start_lng: params.lng,
       })
-      .eq("booking_id", bookingId);
+      .eq("booking_id", bookingId)
+      .select("id");
     if (error) throw error;
+    if (!data || data.length === 0) {
+      throw new Error("No se guardó la confirmación (permiso denegado). Falta correr la migración 0014 en Supabase.");
+    }
     await reload();
   }
 
@@ -116,7 +120,7 @@ export function useVehicleInspection(bookingId: string | null) {
     lng: number | null;
   }) {
     if (!bookingId) return;
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from("vehicle_inspections")
       .update({
         return_status: params.status,
@@ -128,8 +132,12 @@ export function useVehicleInspection(bookingId: string | null) {
         return_lat: params.lat,
         return_lng: params.lng,
       })
-      .eq("booking_id", bookingId);
+      .eq("booking_id", bookingId)
+      .select("id");
     if (error) throw error;
+    if (!data || data.length === 0) {
+      throw new Error("No se guardó la confirmación (permiso denegado). Falta correr la migración 0014 en Supabase.");
+    }
     await reload();
   }
 

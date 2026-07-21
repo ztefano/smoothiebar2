@@ -377,9 +377,16 @@ export default function DriverTripScreen() {
         ) : null}
 
         {booking.status === "accepted" && inspection?.confirmed_at ? (
-          <Pressable style={styles.button} onPress={() => updateStatus("in_progress")}>
-            <Text style={styles.buttonText}>Iniciar viaje</Text>
-          </Pressable>
+          <View style={styles.inspectionBlock}>
+            <View style={styles.confirmBanner}>
+              <Text style={styles.confirmBannerText}>
+                ✓ El cliente confirmó la revisión{inspection.client_confirmation_name ? ` (${inspection.client_confirmation_name})` : ""}. Ya podés arrancar el viaje.
+              </Text>
+            </View>
+            <Pressable style={[styles.button, styles.completeButton]} onPress={() => updateStatus("in_progress")}>
+              <Text style={styles.buttonText}>Iniciar viaje</Text>
+            </Pressable>
+          </View>
         ) : null}
 
         {booking.status === "in_progress" ? (
@@ -557,6 +564,8 @@ const styles = StyleSheet.create({
   inspectionSummary: { fontSize: 12, color: "#6B7280" },
   arrivalHint: { fontSize: 13, color: "#2563EB", fontWeight: "600", textAlign: "center", marginTop: 10 },
   waitingText: { fontSize: 13, color: "#D97706", fontWeight: "600", textAlign: "center" },
+  confirmBanner: { backgroundColor: "#DCFCE7", borderRadius: 10, padding: 12, borderWidth: 1, borderColor: "#86EFAC" },
+  confirmBannerText: { fontSize: 14, color: "#166534", fontWeight: "700", textAlign: "center" },
   fallbackLink: { fontSize: 13, color: "#2563EB", fontWeight: "600", textAlign: "center" },
   signatureInput: {
     borderWidth: 1,

@@ -13,9 +13,14 @@ export function UpdateFab() {
     setChecking(true);
     try {
       if (Updates.isEnabled) {
-        const result = await Updates.checkForUpdateAsync();
+        // Con timeout: si el servidor de updates no responde, no dejamos el
+        // botón colgado para siempre — refrescamos los datos y seguimos.
+        const timeout = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error("timeout")), 12000)
+        );
+        const result = await Promise.race([Updates.checkForUpdateAsync(), timeout]);
         if (result.isAvailable) {
-          await Updates.fetchUpdateAsync();
+          await Promise.race([Updates.fetchUpdateAsync(), timeout]);
           await Updates.reloadAsync();
           return;
         }
@@ -23,7 +28,12 @@ export function UpdateFab() {
       triggerGlobalRefresh();
       Alert.alert("Actualizado", "Se refrescaron los datos de la app (viajes, agendamientos, etc).");
     } catch (err) {
-      Alert.alert("Error al actualizar", (err as Error).message);
+      // Aunque falle la parte OTA, al menos refrescamos los datos.
+      triggerGlobalRefresh();
+      const msg = (err as Error).message === "timeout"
+        ? "No se pudo contactar el servidor de actualizaciones (se refrescaron los datos igual)."
+        : (err as Error).message;
+      Alert.alert("Aviso", msg);
     } finally {
       setChecking(false);
     }

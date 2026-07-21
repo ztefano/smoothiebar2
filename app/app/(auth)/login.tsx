@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, router } from "expo-router";
 import {
   ActivityIndicator,
   Alert,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -11,6 +12,7 @@ import {
 } from "react-native";
 import { useAuth } from "@/state/AuthContext";
 import { supabase } from "@/lib/supabase";
+import { addLoginHistory, getLoginHistory, removeLoginHistory } from "@/lib/loginHistory";
 import type { UserRole } from "@/types";
 
 export default function LoginScreen() {
@@ -20,6 +22,11 @@ export default function LoginScreen() {
   const [loginAs, setLoginAs] = useState<UserRole>("client");
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [history, setHistory] = useState<string[]>([]);
+
+  useEffect(() => {
+    getLoginHistory().then(setHistory);
+  }, []);
 
   async function handleLogin() {
     setLoading(true);
@@ -48,6 +55,7 @@ export default function LoginScreen() {
         return;
       }
 
+      await addLoginHistory(email);
       router.replace("/");
     } catch (err) {
       Alert.alert("No se pudo iniciar sesión", (err as Error).message);
@@ -100,6 +108,22 @@ export default function LoginScreen() {
         value={email}
         onChangeText={setEmail}
       />
+
+      {history.length > 0 ? (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
+          {history.map((h) => (
+            <View key={h} style={styles.chip}>
+              <Pressable onPress={() => setEmail(h)} hitSlop={6}>
+                <Text style={styles.chipText}>{h}</Text>
+              </Pressable>
+              <Pressable onPress={() => removeLoginHistory(h).then(setHistory)} hitSlop={6}>
+                <Text style={styles.chipRemove}>✕</Text>
+              </Pressable>
+            </View>
+          ))}
+        </ScrollView>
+      ) : null}
+
       <TextInput
         style={styles.input}
         placeholder="Contraseña"
@@ -165,6 +189,18 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     fontSize: 15,
   },
+  chipRow: { gap: 8, paddingVertical: 2 },
+  chip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "#F3F4F6",
+    borderRadius: 16,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+  },
+  chipText: { fontSize: 12, color: "#374151", fontWeight: "600" },
+  chipRemove: { fontSize: 12, color: "#9CA3AF", fontWeight: "700" },
   button: {
     backgroundColor: "#111827",
     borderRadius: 10,

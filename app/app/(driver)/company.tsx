@@ -5,7 +5,6 @@ import {
   Alert,
   Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Switch,
   Text,
@@ -18,6 +17,8 @@ import { supabase } from "@/lib/supabase";
 import { useBusinessHours, timeStringToDate } from "@/hooks/useBusinessHours";
 import { usePricingConfig } from "@/hooks/usePricingConfig";
 import { MapPicker } from "@/components/MapPicker";
+import { SheetModal } from "@/components/SheetModal";
+import { formatEuros } from "@/lib/pricing";
 import type { BusinessHours, PricingConfig } from "@/types";
 
 const DAY_LABELS: Record<number, string> = {
@@ -36,21 +37,19 @@ function formatTime(time: string): string {
   return `${h}:${m}`;
 }
 
-/** Panel de admin: horarios de la empresa por día (limitan lo que puede
- * agendar el cliente) y tarifas (tarifa plana, km incluidos, extra por km,
- * y zona de servicio con recargo si la recogida cae fuera de ella). */
 export default function CompanyScreen() {
   const { profile } = useAuth();
   const { hours, loading: loadingHours, reload: reloadHours } = useBusinessHours();
+  const { config: pricing, loading: loadingPricing, reload: reloadPricing } = usePricingConfig();
+
   const [draft, setDraft] = useState<BusinessHours[]>([]);
   const [savingHours, setSavingHours] = useState(false);
-  const [editing, setEditing] = useState<{ day: number; field: "open_time" | "close_time" } | null>(
-    null
-  );
+  const [editing, setEditing] = useState<{ day: number; field: "open_time" | "close_time" } | null>(null);
+  const [showHours, setShowHours] = useState(false);
 
-  const { config: pricing, loading: loadingPricing, reload: reloadPricing } = usePricingConfig();
   const [pricingDraft, setPricingDraft] = useState<Record<string, string>>({});
   const [savingPricing, setSavingPricing] = useState(false);
+  const [showPricing, setShowPricing] = useState(false);
 
   useEffect(() => {
     if (hours.length) setDraft(hours);
@@ -85,16 +84,12 @@ export default function CompanyScreen() {
       for (const day of draft) {
         const { error } = await supabase
           .from("business_hours")
-          .update({
-            is_open: day.is_open,
-            open_time: day.open_time,
-            close_time: day.close_time,
-          })
+          .update({ is_open: day.is_open, open_time: day.open_time, close_time: day.close_time })
           .eq("day_of_week", day.day_of_week);
         if (error) throw error;
       }
-      Alert.alert("Listo", "Se guardaron los horarios de la empresa.");
       await reloadHours();
+      setShowHours(false);
     } catch (err) {
       Alert.alert("No se pudo guardar", (err as Error).message);
     } finally {
@@ -121,8 +116,8 @@ export default function CompanyScreen() {
     try {
       const { error } = await supabase.from("pricing_config").update(parsed).eq("id", 1);
       if (error) throw error;
-      Alert.alert("Listo", "Se guardó la configuración de tarifas.");
       await reloadPricing();
+      setShowPricing(false);
     } catch (err) {
       Alert.alert("No se pudo guardar", (err as Error).message);
     } finally {
@@ -142,82 +137,90 @@ export default function CompanyScreen() {
     );
   }
 
+  const openDays = draft.filter((h) => h.is_open).length;
   const editingDay = editing ? draft.find((h) => h.day_of_week === editing.day) : null;
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>Horarios de la empresa</Text>
-      <Text style={styles.subtitle}>
-        Definí los días y horas en que trabajás. El cliente solo va a poder agendar dentro de estos
-        horarios.
-      </Text>
-
-      {DAY_ORDER.map((day) => {
-        const dayHours = draft.find((h) => h.day_of_week === day);
-        if (!dayHours) return null;
-        return (
-          <View key={day} style={styles.dayCard}>
-            <View style={styles.dayHeader}>
-              <Text style={styles.dayLabel}>{DAY_LABELS[day]}</Text>
-              <Switch
-                value={dayHours.is_open}
-                onValueChange={(value) => updateDay(day, { is_open: value })}
-              />
-            </View>
-            {dayHours.is_open ? (
-              <View style={styles.timeRow}>
-                <Pressable
-                  style={styles.timeButton}
-                  onPress={() => setEditing({ day, field: "open_time" })}
-                >
-                  <Text style={styles.timeLabel}>Desde</Text>
-                  <Text style={styles.timeValue}>{formatTime(dayHours.open_time)}</Text>
-                </Pressable>
-                <Pressable
-                  style={styles.timeButton}
-                  onPress={() => setEditing({ day, field: "close_time" })}
-                >
-                  <Text style={styles.timeLabel}>Hasta</Text>
-                  <Text style={styles.timeValue}>{formatTime(dayHours.close_time)}</Text>
-                </Pressable>
-              </View>
-            ) : (
-              <Text style={styles.closedText}>Cerrado</Text>
-            )}
-          </View>
-        );
-      })}
-
-      {editing && editingDay ? (
-        <DateTimePicker
-          value={timeStringToDate(new Date(), editingDay[editing.field])}
-          mode="time"
-          display={Platform.OS === "ios" ? "spinner" : "default"}
-          onChange={(_event, date) => {
-            setEditing(null);
-            if (!date) return;
-            const h = String(date.getHours()).padStart(2, "0");
-            const m = String(date.getMinutes()).padStart(2, "0");
-            updateDay(editing.day, { [editing.field]: `${h}:${m}:00` } as Partial<BusinessHours>);
-          }}
-        />
-      ) : null}
-
-      <Pressable style={styles.saveButton} onPress={handleSaveHours} disabled={savingHours}>
-        {savingHours ? (
-          <ActivityIndicator color="white" />
-        ) : (
-          <Text style={styles.saveButtonText}>Guardar horarios</Text>
-        )}
+    <View style={styles.container}>
+      <Pressable style={styles.summaryCard} onPress={() => setShowHours(true)}>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.summaryTitle}>Horarios de la empresa</Text>
+          <Text style={styles.summarySub}>
+            {openDays > 0 ? `Abierto ${openDays} día(s) por semana` : "Sin días configurados"}
+          </Text>
+        </View>
+        <Text style={styles.chevron}>›</Text>
       </Pressable>
 
-      <Text style={[styles.title, styles.sectionSpacing]}>Tarifas y zona</Text>
-      <Text style={styles.subtitle}>
-        Tarifa plana hasta los km incluidos, extra por km si el viaje es más largo, y recargo si el
-        punto de recogida cae fuera del radio de la zona de servicio.
-      </Text>
+      <Pressable style={styles.summaryCard} onPress={() => setShowPricing(true)}>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.summaryTitle}>Tarifas y zona</Text>
+          <Text style={styles.summarySub}>
+            {pricing ? `Tarifa plana ${formatEuros(pricing.flat_fare)}` : "Sin configurar"}
+          </Text>
+        </View>
+        <Text style={styles.chevron}>›</Text>
+      </Pressable>
 
-      <View style={styles.dayCard}>
+      {/* Modal de horarios */}
+      <SheetModal visible={showHours} title="Horarios de la empresa" onClose={() => setShowHours(false)}>
+        <Text style={styles.subtitle}>
+          Definí los días y horas en que trabajás. El cliente solo va a poder agendar dentro de estos horarios.
+        </Text>
+        {DAY_ORDER.map((day) => {
+          const dayHours = draft.find((h) => h.day_of_week === day);
+          if (!dayHours) return null;
+          return (
+            <View key={day} style={styles.dayCard}>
+              <View style={styles.dayHeader}>
+                <Text style={styles.dayLabel}>{DAY_LABELS[day]}</Text>
+                <Switch value={dayHours.is_open} onValueChange={(value) => updateDay(day, { is_open: value })} />
+              </View>
+              {dayHours.is_open ? (
+                <View style={styles.timeRow}>
+                  <Pressable style={styles.timeButton} onPress={() => setEditing({ day, field: "open_time" })}>
+                    <Text style={styles.timeLabel}>Desde</Text>
+                    <Text style={styles.timeValue}>{formatTime(dayHours.open_time)}</Text>
+                  </Pressable>
+                  <Pressable style={styles.timeButton} onPress={() => setEditing({ day, field: "close_time" })}>
+                    <Text style={styles.timeLabel}>Hasta</Text>
+                    <Text style={styles.timeValue}>{formatTime(dayHours.close_time)}</Text>
+                  </Pressable>
+                </View>
+              ) : (
+                <Text style={styles.closedText}>Cerrado</Text>
+              )}
+            </View>
+          );
+        })}
+
+        {editing && editingDay ? (
+          <DateTimePicker
+            value={timeStringToDate(new Date(), editingDay[editing.field])}
+            mode="time"
+            display={Platform.OS === "ios" ? "spinner" : "default"}
+            onChange={(_event, date) => {
+              setEditing(null);
+              if (!date) return;
+              const h = String(date.getHours()).padStart(2, "0");
+              const m = String(date.getMinutes()).padStart(2, "0");
+              updateDay(editing.day, { [editing.field]: `${h}:${m}:00` } as Partial<BusinessHours>);
+            }}
+          />
+        ) : null}
+
+        <Pressable style={styles.saveButton} onPress={handleSaveHours} disabled={savingHours}>
+          {savingHours ? <ActivityIndicator color="white" /> : <Text style={styles.saveButtonText}>Guardar horarios</Text>}
+        </Pressable>
+      </SheetModal>
+
+      {/* Modal de tarifas */}
+      <SheetModal visible={showPricing} title="Tarifas y zona" onClose={() => setShowPricing(false)}>
+        <Text style={styles.subtitle}>
+          Tarifa plana hasta los km incluidos, extra por km si el viaje es más largo, y recargo si el punto de
+          recogida cae fuera del radio de la zona de servicio.
+        </Text>
+
         <Text style={styles.fieldLabel}>Tarifa plana (€)</Text>
         <TextInput
           style={styles.input}
@@ -225,7 +228,6 @@ export default function CompanyScreen() {
           value={pricingDraft.flat_fare ?? ""}
           onChangeText={(v) => setPricingField("flat_fare", v)}
         />
-
         <Text style={styles.fieldLabel}>Km incluidos en la tarifa plana</Text>
         <TextInput
           style={styles.input}
@@ -233,7 +235,6 @@ export default function CompanyScreen() {
           value={pricingDraft.flat_km ?? ""}
           onChangeText={(v) => setPricingField("flat_km", v)}
         />
-
         <Text style={styles.fieldLabel}>Precio por km extra (€/km)</Text>
         <TextInput
           style={styles.input}
@@ -241,7 +242,6 @@ export default function CompanyScreen() {
           value={pricingDraft.extra_km_price ?? ""}
           onChangeText={(v) => setPricingField("extra_km_price", v)}
         />
-
         <Text style={styles.fieldLabel}>Radio de la zona de servicio (km)</Text>
         <TextInput
           style={styles.input}
@@ -249,7 +249,6 @@ export default function CompanyScreen() {
           value={pricingDraft.zone_radius_km ?? ""}
           onChangeText={(v) => setPricingField("zone_radius_km", v)}
         />
-
         <Text style={styles.fieldLabel}>Recargo por km fuera de la zona (€/km)</Text>
         <TextInput
           style={styles.input}
@@ -257,7 +256,6 @@ export default function CompanyScreen() {
           value={pricingDraft.out_of_zone_km_price ?? ""}
           onChangeText={(v) => setPricingField("out_of_zone_km_price", v)}
         />
-
         <Text style={styles.fieldLabel}>Descuento por pagar en efectivo (%)</Text>
         <TextInput
           style={styles.input}
@@ -265,38 +263,44 @@ export default function CompanyScreen() {
           value={pricingDraft.cash_discount_percent ?? ""}
           onChangeText={(v) => setPricingField("cash_discount_percent", v)}
         />
-      </View>
 
-      {pricingDraft.zone_center_lat && pricingDraft.zone_center_lng ? (
-        <MapPicker
-          label="Centro de la zona de servicio"
-          initialLocation={{
-            lat: Number(pricingDraft.zone_center_lat),
-            lng: Number(pricingDraft.zone_center_lng),
-          }}
-          onChange={(coords) => {
-            setPricingField("zone_center_lat", String(coords.lat));
-            setPricingField("zone_center_lng", String(coords.lng));
-          }}
-        />
-      ) : null}
+        {pricingDraft.zone_center_lat && pricingDraft.zone_center_lng ? (
+          <MapPicker
+            label="Centro de la zona de servicio"
+            initialLocation={{
+              lat: Number(pricingDraft.zone_center_lat),
+              lng: Number(pricingDraft.zone_center_lng),
+            }}
+            onChange={(coords) => {
+              setPricingField("zone_center_lat", String(coords.lat));
+              setPricingField("zone_center_lng", String(coords.lng));
+            }}
+          />
+        ) : null}
 
-      <Pressable style={styles.saveButton} onPress={handleSavePricing} disabled={savingPricing}>
-        {savingPricing ? (
-          <ActivityIndicator color="white" />
-        ) : (
-          <Text style={styles.saveButtonText}>Guardar tarifas</Text>
-        )}
-      </Pressable>
-    </ScrollView>
+        <Pressable style={styles.saveButton} onPress={handleSavePricing} disabled={savingPricing}>
+          {savingPricing ? <ActivityIndicator color="white" /> : <Text style={styles.saveButtonText}>Guardar tarifas</Text>}
+        </Pressable>
+      </SheetModal>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { padding: 20, gap: 12 },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
-  title: { fontSize: 20, fontWeight: "800", color: "#111827" },
-  sectionSpacing: { marginTop: 12 },
+  summaryCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "white",
+    borderRadius: 12,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+  },
+  summaryTitle: { fontSize: 16, fontWeight: "800", color: "#111827" },
+  summarySub: { fontSize: 13, color: "#6B7280", marginTop: 2 },
+  chevron: { fontSize: 26, color: "#9CA3AF", fontWeight: "700" },
   subtitle: { fontSize: 13, color: "#6B7280", marginBottom: 4 },
   dayCard: {
     backgroundColor: "white",

@@ -1,10 +1,13 @@
 import { useState } from "react";
-import { Alert, FlatList, Pressable, StyleSheet, Switch, Text, View } from "react-native";
+import { Alert, FlatList, Pressable, ScrollView, StyleSheet, Switch, Text, View } from "react-native";
+import { router } from "expo-router";
 import { useAuth } from "@/state/AuthContext";
-import { usePendingBookings } from "@/hooks/useBooking";
+import { useAllBookings, useDriverBookings } from "@/hooks/useBooking";
 import { useDrivers } from "@/hooks/useDrivers";
 import { BookingCard } from "@/components/BookingCard";
+import { BookingDetail } from "@/components/BookingDetail";
 import { DriverAssignModal } from "@/components/DriverAssignModal";
+import { SheetModal } from "@/components/SheetModal";
 import { supabase } from "@/lib/supabase";
 import { DateTimeField } from "@/components/DateTimeField";
 import { useBookedTimes } from "@/hooks/useBookedTimes";
@@ -12,7 +15,16 @@ import { useBusinessHours } from "@/hooks/useBusinessHours";
 import { useActiveDriverCount } from "@/hooks/useActiveDriverCount";
 import { useAdminBlockedSlots } from "@/hooks/useAdminBlockedSlots";
 import { sendPushToUsers } from "@/lib/pushSend";
-import type { Booking, Profile } from "@/types";
+import type { Booking, BookingStatus, Profile } from "@/types";
+
+type TabKey = "sin_asignar" | "asignadas" | "canceladas" | "finalizadas";
+
+const TABS: { key: TabKey; label: string; statuses: BookingStatus[] }[] = [
+  { key: "sin_asignar", label: "Sin asignar", statuses: ["pending"] },
+  { key: "asignadas", label: "Asignadas", statuses: ["accepted", "in_progress"] },
+  { key: "canceladas", label: "Canceladas", statuses: ["cancelled"] },
+  { key: "finalizadas", label: "Finalizadas", statuses: ["completed"] },
+];
 
 function AdminBlockPanel() {
   const [blockAt, setBlockAt] = useState(() => new Date(Date.now() + 15 * 60 * 1000));
@@ -34,22 +46,12 @@ function AdminBlockPanel() {
     }
   }
 
-  async function handleRemove(id: string) {
-    try {
-      await removeBlock(id);
-    } catch (err) {
-      Alert.alert("No se pudo quitar el bloqueo", (err as Error).message);
-    }
-  }
-
   return (
-    <View style={styles.blockPanel}>
-      <Text style={styles.blockTitle}>Bloquear horario por imprevistos</Text>
+    <View style={{ gap: 10 }}>
       <Text style={styles.blockSubtitle}>
-        Si tenés poco personal, bloqueá un horario para que no se siga agendando ahí (cuenta como si
-        fuera una reserva más para el cálculo de disponibilidad).
+        Si tenés poco personal, bloqueá un horario para que no se siga agendando ahí (cuenta como una
+        reserva más para la disponibilidad).
       </Text>
-
       <DateTimeField
         label="Horario a bloquear"
         value={blockAt}
@@ -60,20 +62,16 @@ function AdminBlockPanel() {
         businessHours={businessHours}
         onChange={setBlockAt}
       />
-
       <Pressable style={styles.blockButton} onPress={handleBlock} disabled={blocking}>
         <Text style={styles.blockButtonText}>Bloquear este horario</Text>
       </Pressable>
-
       {blockedSlots.length > 0 ? (
         <View style={styles.blockList}>
           <Text style={styles.blockListTitle}>Bloqueados próximos</Text>
           {blockedSlots.map((slot) => (
             <View key={slot.id} style={styles.blockRow}>
-              <Text style={styles.blockRowText}>
-                {new Date(slot.blocked_at).toLocaleString("es-ES")}
-              </Text>
-              <Pressable onPress={() => handleRemove(slot.id)}>
+              <Text style={styles.blockRowText}>{new Date(slot.blocked_at).toLocaleString("es-ES")}</Text>
+              <Pressable onPress={() => removeBlock(slot.id).catch((e) => Alert.alert("Error", e.message))}>
                 <Text style={styles.blockRemove}>Quitar</Text>
               </Pressable>
             </View>
@@ -84,25 +82,22 @@ function AdminBlockPanel() {
   );
 }
 
-export default function DriverRequestsScreen() {
-  const { profile, refreshProfile } = useAuth();
-  const isAdmin = !!profile?.is_admin;
-  const { bookings, loading } = usePendingBookings();
+/** Vista del admin: todas las reservas separadas por estado en pestañas. */
+function AdminRequests() {
+  const { bookings } = useAllBookings();
   const { drivers } = useDrivers();
+  const [tab, setTab] = useState<TabKey>("sin_asignar");
   const [assigningBookingId, setAssigningBookingId] = useState<string | null>(null);
   const [assigning, setAssigning] = useState(false);
+  const [detail, setDetail] = useState<Booking | null>(null);
+  const [showBlock, setShowBlock] = useState(false);
 
-  async function toggleOnline(value: boolean) {
-    if (!profile) return;
-    const { error } = await supabase
-      .from("profiles")
-      .update({ is_online: value })
-      .eq("id", profile.id);
-    if (error) {
-      Alert.alert("No se pudo actualizar", error.message);
-      return;
-    }
-    await refreshProfile();
+  const activeTab = TABS.find((t) => t.key === tab)!;
+  const filtered = bookings.filter((b) => activeTab.statuses.includes(b.status));
+
+  function countFor(key: TabKey) {
+    const t = TABS.find((x) => x.key === key)!;
+    return bookings.filter((b) => t.statuses.includes(b.status)).length;
   }
 
   function handleCancel(booking: Booking) {
@@ -117,12 +112,9 @@ export default function DriverRequestsScreen() {
             Alert.alert("No se pudo cancelar", error.message);
             return;
           }
-          sendPushToUsers(
-            [booking.client_id],
-            "Tu reserva fue cancelada",
-            "Contactanos si tenés dudas sobre tu viaje.",
-            { bookingId: booking.id }
-          );
+          sendPushToUsers([booking.client_id], "Tu reserva fue cancelada", "Contactanos si tenés dudas.", {
+            bookingId: booking.id,
+          });
         },
       },
     ]);
@@ -136,32 +128,19 @@ export default function DriverRequestsScreen() {
         .from("bookings")
         .update({ status: "accepted", driver_id: driver.id })
         .eq("id", assigningBookingId)
-        .eq("status", "pending") // evita asignar dos veces la misma reserva
+        .eq("status", "pending")
         .select("client_id")
         .maybeSingle();
-
       if (error) throw error;
-      if (!data) {
-        throw new Error(
-          "No se modificó ninguna reserva. La reserva puede ya no estar pendiente, o falta correr la " +
-            "migración 0016_admin_assigns_driver.sql en el SQL Editor de Supabase."
-        );
+      if (!data) throw new Error("La reserva ya no está pendiente, o falta correr la migración 0016 en Supabase.");
+      if (data.client_id) {
+        sendPushToUsers([data.client_id as string], "Se te ha asignado un chofer", `${driver.full_name} ya está en camino.`, {
+          bookingId: assigningBookingId,
+        });
       }
-
-      if (data?.client_id) {
-        sendPushToUsers(
-          [data.client_id as string],
-          "Se te ha asignado un chofer",
-          `${driver.full_name} fue asignado a tu viaje y ya está en camino.`,
-          { bookingId: assigningBookingId }
-        );
-      }
-      sendPushToUsers(
-        [driver.id],
-        "¡Recibiste un viaje!",
-        "Tenés un viaje nuevo asignado. Revisalo en Servicio.",
-        { bookingId: assigningBookingId }
-      );
+      sendPushToUsers([driver.id], "¡Recibiste un viaje!", "Tenés un viaje nuevo asignado. Revisalo en Servicio.", {
+        bookingId: assigningBookingId,
+      });
       setAssigningBookingId(null);
     } catch (err) {
       Alert.alert("No se pudo asignar", (err as Error).message);
@@ -170,60 +149,54 @@ export default function DriverRequestsScreen() {
     }
   }
 
-  if (!isAdmin) {
-    return (
-      <View style={styles.container}>
-        <View style={styles.onlineRow}>
-          <Text style={styles.onlineLabel}>
-            {profile?.is_online ? "Estás disponible" : "Estás desconectado"}
-          </Text>
-          <Switch value={profile?.is_online ?? false} onValueChange={toggleOnline} />
-        </View>
-        <View style={styles.empty}>
-          <Text style={styles.emptyTitle}>Los viajes los asigna el administrador</Text>
-          <Text style={styles.emptySubtitle}>
-            Cuando te asignen un servicio, te va a llegar una notificación y lo vas a ver en "Servicio".
-          </Text>
-        </View>
-      </View>
-    );
-  }
-
   return (
     <View style={styles.container}>
-      <View style={styles.onlineRow}>
-        <Text style={styles.onlineLabel}>
-          {profile?.is_online ? "Estás disponible" : "Estás desconectado"}
-        </Text>
-        <Switch value={profile?.is_online ?? false} onValueChange={toggleOnline} />
-      </View>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.tabsRow}
+        style={styles.tabsWrap}
+      >
+        {TABS.map((t) => (
+          <Pressable key={t.key} style={[styles.tab, tab === t.key && styles.tabActive]} onPress={() => setTab(t.key)}>
+            <Text style={[styles.tabText, tab === t.key && styles.tabTextActive]}>
+              {t.label} ({countFor(t.key)})
+            </Text>
+          </Pressable>
+        ))}
+      </ScrollView>
 
       <FlatList
         contentContainerStyle={styles.list}
-        data={bookings}
+        data={filtered}
         keyExtractor={(item) => item.id}
-        refreshing={loading}
-        ListHeaderComponent={<AdminBlockPanel />}
-        ListEmptyComponent={
-          <View style={styles.empty}>
-            <Text>No hay solicitudes pendientes por ahora.</Text>
-          </View>
+        ListHeaderComponent={
+          tab === "sin_asignar" ? (
+            <Pressable style={styles.blockAccess} onPress={() => setShowBlock(true)}>
+              <Text style={styles.blockAccessText}>⛔ Bloquear un horario por imprevistos</Text>
+            </Pressable>
+          ) : null
         }
+        ListEmptyComponent={<Text style={styles.empty}>No hay reservas en esta pestaña.</Text>}
         renderItem={({ item }) => (
           <View style={styles.cardWrapper}>
             <BookingCard booking={item} />
             <View style={styles.actionsRow}>
-              <Pressable
-                style={[styles.actionButton, styles.acceptButton]}
-                onPress={() => setAssigningBookingId(item.id)}
-              >
-                <Text style={styles.actionButtonText}>Aceptar reserva</Text>
-              </Pressable>
-              <Pressable
-                style={[styles.actionButton, styles.cancelButton]}
-                onPress={() => handleCancel(item)}
-              >
-                <Text style={styles.actionButtonText}>Cancelar</Text>
+              {item.status === "pending" ? (
+                <>
+                  <Pressable
+                    style={[styles.actionButton, styles.acceptButton]}
+                    onPress={() => setAssigningBookingId(item.id)}
+                  >
+                    <Text style={styles.actionButtonText}>Aceptar</Text>
+                  </Pressable>
+                  <Pressable style={[styles.actionButton, styles.cancelButton]} onPress={() => handleCancel(item)}>
+                    <Text style={styles.actionButtonText}>Cancelar</Text>
+                  </Pressable>
+                </>
+              ) : null}
+              <Pressable style={[styles.actionButton, styles.detailButton]} onPress={() => setDetail(item)}>
+                <Text style={styles.detailButtonText}>Ver detalle</Text>
               </Pressable>
             </View>
           </View>
@@ -238,6 +211,84 @@ export default function DriverRequestsScreen() {
         onSelect={handleAssign}
         onClose={() => setAssigningBookingId(null)}
       />
+
+      <SheetModal visible={!!detail} title="Detalle del servicio" onClose={() => setDetail(null)}>
+        {detail ? <BookingDetail booking={detail} /> : null}
+      </SheetModal>
+
+      <SheetModal visible={showBlock} title="Bloquear horario" onClose={() => setShowBlock(false)}>
+        <AdminBlockPanel />
+      </SheetModal>
+    </View>
+  );
+}
+
+/** Vista del chofer no-admin: sus servicios asignados. */
+function DriverRequests() {
+  const { profile } = useAuth();
+  const { bookings } = useDriverBookings(profile?.id ?? null);
+  const [detail, setDetail] = useState<Booking | null>(null);
+
+  return (
+    <View style={styles.container}>
+      <FlatList
+        contentContainerStyle={styles.list}
+        data={bookings}
+        keyExtractor={(item) => item.id}
+        ListHeaderComponent={<Text style={styles.title}>Mis servicios</Text>}
+        ListEmptyComponent={
+          <View style={styles.emptyBox}>
+            <Text style={styles.emptyTitle}>Todavía no tenés servicios asignados</Text>
+            <Text style={styles.emptySubtitle}>Cuando el administrador te asigne un viaje, va a aparecer acá.</Text>
+          </View>
+        }
+        renderItem={({ item }) => (
+          <View style={styles.cardWrapper}>
+            <BookingCard booking={item} />
+            <View style={styles.actionsRow}>
+              {item.status === "accepted" || item.status === "in_progress" ? (
+                <Pressable
+                  style={[styles.actionButton, styles.acceptButton]}
+                  onPress={() => router.push(`/(driver)/trip/${item.id}`)}
+                >
+                  <Text style={styles.actionButtonText}>Ir al servicio</Text>
+                </Pressable>
+              ) : null}
+              <Pressable style={[styles.actionButton, styles.detailButton]} onPress={() => setDetail(item)}>
+                <Text style={styles.detailButtonText}>Ver detalle</Text>
+              </Pressable>
+            </View>
+          </View>
+        )}
+        ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
+      />
+      <SheetModal visible={!!detail} title="Detalle del servicio" onClose={() => setDetail(null)}>
+        {detail ? <BookingDetail booking={detail} /> : null}
+      </SheetModal>
+    </View>
+  );
+}
+
+export default function DriverRequestsScreen() {
+  const { profile, refreshProfile } = useAuth();
+
+  async function toggleOnline(value: boolean) {
+    if (!profile) return;
+    const { error } = await supabase.from("profiles").update({ is_online: value }).eq("id", profile.id);
+    if (error) {
+      Alert.alert("No se pudo actualizar", error.message);
+      return;
+    }
+    await refreshProfile();
+  }
+
+  return (
+    <View style={{ flex: 1 }}>
+      <View style={styles.onlineRow}>
+        <Text style={styles.onlineLabel}>{profile?.is_online ? "Estás disponible" : "Estás desconectado"}</Text>
+        <Switch value={profile?.is_online ?? false} onValueChange={toggleOnline} />
+      </View>
+      {profile?.is_admin ? <AdminRequests /> : <DriverRequests />}
     </View>
   );
 }
@@ -254,8 +305,16 @@ const styles = StyleSheet.create({
     borderColor: "#E5E7EB",
   },
   onlineLabel: { fontSize: 15, fontWeight: "600", color: "#111827" },
+  tabsWrap: { maxHeight: 52, backgroundColor: "white", borderBottomWidth: 1, borderColor: "#E5E7EB" },
+  tabsRow: { paddingHorizontal: 12, paddingVertical: 8, gap: 8, alignItems: "center" },
+  tab: { paddingVertical: 8, paddingHorizontal: 14, borderRadius: 20, backgroundColor: "#F3F4F6" },
+  tabActive: { backgroundColor: "#111827" },
+  tabText: { fontSize: 13, fontWeight: "700", color: "#374151" },
+  tabTextActive: { color: "white" },
   list: { padding: 16, flexGrow: 1 },
-  empty: { flex: 1, alignItems: "center", justifyContent: "center", paddingTop: 60, gap: 8, paddingHorizontal: 24 },
+  title: { fontSize: 20, fontWeight: "800", color: "#111827", marginBottom: 12 },
+  empty: { textAlign: "center", color: "#6B7280", marginTop: 40 },
+  emptyBox: { alignItems: "center", justifyContent: "center", paddingTop: 60, gap: 8, paddingHorizontal: 24 },
   emptyTitle: { fontSize: 16, fontWeight: "800", color: "#111827", textAlign: "center" },
   emptySubtitle: { fontSize: 13, color: "#6B7280", textAlign: "center" },
   cardWrapper: { gap: 8 },
@@ -263,17 +322,19 @@ const styles = StyleSheet.create({
   actionButton: { flex: 1, borderRadius: 10, paddingVertical: 12, alignItems: "center" },
   acceptButton: { backgroundColor: "#16A34A" },
   cancelButton: { backgroundColor: "#DC2626" },
+  detailButton: { borderWidth: 1, borderColor: "#E5E7EB", backgroundColor: "white" },
   actionButtonText: { color: "white", fontWeight: "700", fontSize: 14 },
-  blockPanel: {
-    backgroundColor: "white",
-    borderRadius: 12,
+  detailButtonText: { color: "#2563EB", fontWeight: "700", fontSize: 14 },
+  blockAccess: {
+    backgroundColor: "#FEF2F2",
+    borderRadius: 10,
     borderWidth: 1,
-    borderColor: "#E5E7EB",
-    padding: 14,
-    gap: 10,
-    marginBottom: 16,
+    borderColor: "#FECACA",
+    paddingVertical: 12,
+    alignItems: "center",
+    marginBottom: 12,
   },
-  blockTitle: { fontSize: 15, fontWeight: "700", color: "#111827" },
+  blockAccessText: { color: "#DC2626", fontWeight: "700", fontSize: 13 },
   blockSubtitle: { fontSize: 12, color: "#6B7280" },
   blockButton: { backgroundColor: "#DC2626", borderRadius: 8, paddingVertical: 12, alignItems: "center" },
   blockButtonText: { color: "white", fontWeight: "700", fontSize: 14 },

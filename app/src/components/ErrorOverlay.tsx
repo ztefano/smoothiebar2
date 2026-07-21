@@ -39,10 +39,11 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, { error: E
       return (
         <View style={styles.fatal}>
           <Text style={styles.fatalTitle}>Ocurrió un error en esta pantalla</Text>
+          <Text selectable style={styles.fatalMessage}>
+            {this.state.error.name}: {this.state.error.message}
+          </Text>
           <ScrollView style={styles.fatalScroll}>
-            <Text style={styles.fatalText}>
-              {this.state.error.name}: {this.state.error.message}
-              {"\n\n"}
+            <Text selectable style={styles.fatalText}>
               {this.state.error.stack}
             </Text>
           </ScrollView>
@@ -75,7 +76,7 @@ export function ErrorBubble() {
         <Text style={styles.panelTitle}>Errores ({logs.length})</Text>
         <ScrollView style={styles.panelScroll}>
           {logs.map((l, i) => (
-            <Text key={i} style={styles.panelLine}>
+            <Text key={i} selectable style={styles.panelLine}>
               {l}
             </Text>
           ))}
@@ -132,6 +133,7 @@ const styles = StyleSheet.create({
   panelBtnText: { color: "white", fontWeight: "700" },
   fatal: { flex: 1, backgroundColor: "#111827", padding: 20, paddingTop: 60 },
   fatalTitle: { color: "#F87171", fontSize: 18, fontWeight: "800", marginBottom: 12 },
+  fatalMessage: { color: "#FCA5A5", fontSize: 14, fontWeight: "700", marginBottom: 12 },
   fatalScroll: { flex: 1 },
   fatalText: { color: "#E5E7EB", fontSize: 12, fontFamily: "monospace" },
   fatalButton: { backgroundColor: "#2563EB", borderRadius: 10, paddingVertical: 14, alignItems: "center", marginTop: 12 },

@@ -5,6 +5,7 @@ import * as WebBrowser from "expo-web-browser";
 import * as Notifications from "expo-notifications";
 import { AuthProvider, useAuth } from "@/state/AuthContext";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
+import { useForegroundRefresh } from "@/hooks/useForegroundRefresh";
 import { UpdateFab } from "@/components/UpdateFab";
 import { IncomingTripAlert } from "@/components/IncomingTripAlert";
 import { DriverAssignedAlert } from "@/components/DriverAssignedAlert";
@@ -18,6 +19,7 @@ WebBrowser.maybeCompleteAuthSession();
 function PushNotificationRegistrar() {
   const { profile } = useAuth();
   usePushNotifications(profile?.id ?? null);
+  useForegroundRefresh();
 
   // Al tocar una notificación (con la app abierta, en segundo plano o
   // cerrada), navega directo al viaje al que corresponde en vez de dejar
